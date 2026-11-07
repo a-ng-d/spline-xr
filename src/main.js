@@ -3,8 +3,13 @@ import {
   WebGLRenderer, PerspectiveCamera, Scene, AmbientLight, DirectionalLight,
   Color, Clock, Vector3, Group, Raycaster, Box3,
   BufferGeometry, Float32BufferAttribute, Line, LineBasicMaterial,
-  SphereGeometry, MeshBasicMaterial, Mesh, RingGeometry, Matrix4
+  SphereGeometry, MeshBasicMaterial, Mesh, RingGeometry, Matrix4, CircleGeometry
 } from 'three'
+
+// ── Debug : ajouter ?debug à l'URL pour activer le HUD et les logs ──────────────
+const DEBUG = new URLSearchParams(location.search).has('debug')
+const log  = (...a) => { if (DEBUG) console.log('[SplineXR]', ...a) }
+const warn = (...a) => console.warn('[SplineXR]', ...a)
 
 // ── Constantes ─────────────────────────────────────────────────────────────────
 const SCENES = [
@@ -37,7 +42,7 @@ const bgCanvas  = document.getElementById('bg-canvas')
 const debugEl = document.createElement('div')
 debugEl.style.cssText = 'position:fixed;top:8px;left:8px;z-index:30;color:#0f0;font:11px monospace;background:rgba(0,0,0,.85);padding:8px 12px;border-radius:6px;pointer-events:none;display:none;max-width:400px;white-space:pre-wrap;line-height:1.4;'
 document.body.appendChild(debugEl)
-function debugLog(msg) { debugEl.style.display = 'block'; debugEl.textContent = msg }
+function debugLog(msg) { if (!DEBUG) return; debugEl.style.display = 'block'; debugEl.textContent = msg }
 
 // ── Fond animé ─────────────────────────────────────────────────────────────────
 {
@@ -122,19 +127,42 @@ function resize() {
 window.addEventListener('resize', resize)
 
 // ══════════════════════════════════════════════════════════════════════════════
-// CONTRÔLES VR
+// VISUELS DE POINTAGE
+// Les scènes Spline sont en « pixels » (une carte fait ~300 unités) alors que
+// les manettes sont en mètres : rayon, curseur et marqueur de téléport sont
+// donc mis à l'échelle de la distance pour garder une taille apparente fixe.
 // ══════════════════════════════════════════════════════════════════════════════
-function makeRayLine(color = 0x7b6ef6) {
+const RAY_IDLE_LENGTH = 300   // longueur du rayon sans cible (unités scène)
+const CURSOR_ANGULAR  = 0.012 // taille du curseur ≈ 0,7° de champ de vision
+
+function makeRayLine(color) {
   const geo = new BufferGeometry()
-  geo.setAttribute('position', new Float32BufferAttribute([0,0,0, 0,0,-50], 3))
-  return new Line(geo, new LineBasicMaterial({ color, transparent: true, opacity: 0.6 }))
+  geo.setAttribute('position', new Float32BufferAttribute([0, 0, 0, 0, 0, -1], 3))
+  const line = new Line(geo, new LineBasicMaterial({ color, transparent: true, opacity: 0.55 }))
+  line.scale.z = RAY_IDLE_LENGTH
+  line.visible = false
+  return line
 }
+
+function makeCursor(color) {
+  const g = new Group()
+  const ringMat = new MeshBasicMaterial({ color, transparent: true, opacity: 0.95, depthTest: false })
+  const dotMat  = new MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.95, depthTest: false })
+  const ring = new Mesh(new RingGeometry(0.55, 1, 32), ringMat)
+  const dot  = new Mesh(new CircleGeometry(0.28, 24), dotMat)
+  ring.renderOrder = dot.renderOrder = 999
+  g.add(ring, dot)
+  g.visible = false
+  return { group: g, ring, dot, ringMat }
+}
+
 function makeTeleportMarker() {
   const g = new Group()
-  g.add(new Mesh(new RingGeometry(0.15, 0.22, 32), new MeshBasicMaterial({ color: 0x3ecfcf, transparent: true, opacity: 0.85, side: 2 })))
-  g.children[0].rotation.x = -Math.PI / 2
-  g.add(new Mesh(new SphereGeometry(0.05, 16, 16), new MeshBasicMaterial({ color: 0xffffff })))
-  g.visible = false; return g
+  const ring = new Mesh(new RingGeometry(0.7, 1, 32), new MeshBasicMaterial({ color: 0x3ecfcf, transparent: true, opacity: 0.85, side: 2 }))
+  ring.rotation.x = -Math.PI / 2
+  g.add(ring)
+  g.visible = false
+  return g
 }
 const teleportMarker = makeTeleportMarker()
 
@@ -167,104 +195,101 @@ function createControllerModel(side) {
     new MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0 }))
   triggerLight.position.copy(trigger.position); g.add(triggerLight)
   g.rotation.x = 0.3
-  return { group: g, stick, triggerLight, accentMat }
+  return { group: g, stick, triggerLight }
 }
 
-const controllers = [0, 1].map(i => {
-  const ctrl = renderer.xr.getController(i)
-  const grip = renderer.xr.getControllerGrip(i)
-  const model = createControllerModel(i); grip.add(model.group)
-  const ray = makeRayLine(i === 0 ? 0x7b6ef6 : 0x3ecfcf); ctrl.add(ray)
-  // Dot cursor — sphère au point d'impact
-  const dot = new Mesh(new SphereGeometry(0.012, 8, 8), new MeshBasicMaterial({ color: 0xffffff }))
-  dot.visible = false; ctrl.add(dot)
-  return { ctrl, grip, ray, dot, side: i, triggerPrev: false, model }
-})
-
-// ── Hand tracking ────────────────────────────────────────────────────────────
-const FINGER_JOINTS = [
-  ['thumb-metacarpal','thumb-phalanx-proximal','thumb-phalanx-distal','thumb-tip'],
-  ['index-finger-metacarpal','index-finger-phalanx-proximal','index-finger-phalanx-intermediate','index-finger-phalanx-distal','index-finger-tip'],
-  ['middle-finger-metacarpal','middle-finger-phalanx-proximal','middle-finger-phalanx-intermediate','middle-finger-phalanx-distal','middle-finger-tip'],
-  ['ring-finger-metacarpal','ring-finger-phalanx-proximal','ring-finger-phalanx-intermediate','ring-finger-phalanx-distal','ring-finger-tip'],
-  ['pinky-finger-metacarpal','pinky-finger-phalanx-proximal','pinky-finger-phalanx-intermediate','pinky-finger-phalanx-distal','pinky-finger-tip'],
+// ── Modèle de main (articulations) ────────────────────────────────────────────
+const HAND_JOINTS = [
+  'wrist',
+  'thumb-metacarpal','thumb-phalanx-proximal','thumb-phalanx-distal','thumb-tip',
+  'index-finger-metacarpal','index-finger-phalanx-proximal','index-finger-phalanx-intermediate','index-finger-phalanx-distal','index-finger-tip',
+  'middle-finger-metacarpal','middle-finger-phalanx-proximal','middle-finger-phalanx-intermediate','middle-finger-phalanx-distal','middle-finger-tip',
+  'ring-finger-metacarpal','ring-finger-phalanx-proximal','ring-finger-phalanx-intermediate','ring-finger-phalanx-distal','ring-finger-tip',
+  'pinky-finger-metacarpal','pinky-finger-phalanx-proximal','pinky-finger-phalanx-intermediate','pinky-finger-phalanx-distal','pinky-finger-tip',
 ]
 function createHandModel(side) {
   const group = new Group()
-  const matBone = new MeshBasicMaterial({ color: side === 0 ? 0x7b6ef6 : 0x3ecfcf, transparent: true, opacity: 0.75 })
-  const matTip = new MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.9 })
-  const jointMeshes = {}
-  ;[...new Set(FINGER_JOINTS.flat().concat(['wrist']))].forEach(name => {
-    const isTip = name.endsWith('-tip'), r = isTip ? 0.007 : name === 'wrist' ? 0.012 : 0.006
-    const mesh = new Mesh(new SphereGeometry(r, 8, 6), isTip ? matTip : matBone)
-    mesh.visible = false; group.add(mesh); jointMeshes[name] = mesh
+  const matJoint = new MeshBasicMaterial({ color: side === 0 ? 0x7b6ef6 : 0x3ecfcf, transparent: true, opacity: 0.75 })
+  const matTip   = new MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.9 })
+  const meshes = {}
+  HAND_JOINTS.forEach(name => {
+    const isTip = name.endsWith('-tip')
+    const r = isTip ? 0.007 : name === 'wrist' ? 0.012 : 0.006
+    const m = new Mesh(new SphereGeometry(r, 8, 6), isTip ? matTip : matJoint)
+    m.visible = false; group.add(m); meshes[name] = m
   })
-  const boneMeshes = []
-  FINGER_JOINTS.forEach(finger => {
-    finger.forEach((jName, idx) => {
-      if (idx === 0) return
-      const bone = new Mesh(new SphereGeometry(0.003, 6, 4), matBone.clone())
-      bone.visible = false; group.add(bone)
-      boneMeshes.push({ mesh: bone, from: finger[idx-1], to: jName })
-    })
-  })
-  return { group, jointMeshes, boneMeshes, matBone, matTip }
+  return { group, meshes, matTip }
 }
-const _bF = new Vector3(), _bT = new Vector3(), _bM = new Vector3()
-function updateHandModel(model, joints, isPinching) {
-  if (!joints) return
-  for (const [name, mesh] of Object.entries(model.jointMeshes)) {
-    const j = joints[name]
-    if (j) { mesh.position.setFromMatrixPosition(j.matrixWorld); mesh.position.sub(model.group.getWorldPosition(new Vector3())); mesh.visible = true }
-    else mesh.visible = false
+// Les articulations sont des enfants de l'objet main (même repère que le rig) :
+// on recopie simplement leur position locale.
+function updateHandModel(model, hand, selecting) {
+  for (const name of HAND_JOINTS) {
+    const j = hand.joints[name], m = model.meshes[name]
+    if (j && j.visible !== false) { m.position.copy(j.position); m.visible = true }
+    else m.visible = false
   }
-  model.boneMeshes.forEach(({ mesh, from, to }) => {
-    const jF = joints[from], jT = joints[to]
-    if (!jF || !jT) { mesh.visible = false; return }
-    _bF.setFromMatrixPosition(jF.matrixWorld); _bT.setFromMatrixPosition(jT.matrixWorld)
-    const off = model.group.getWorldPosition(new Vector3()); _bF.sub(off); _bT.sub(off)
-    _bM.addVectors(_bF, _bT).multiplyScalar(0.5); mesh.position.copy(_bM)
-    mesh.scale.set(1, _bF.distanceTo(_bT) * 60, 1); mesh.visible = true
-  })
-  const iT = model.jointMeshes['index-finger-tip'], tT = model.jointMeshes['thumb-tip']
-  if (iT) iT.material.color.setHex(isPinching ? 0x3ecfcf : 0xffffff)
-  if (tT) tT.material.color.setHex(isPinching ? 0x3ecfcf : 0xffffff)
+  model.matTip.color.setHex(selecting ? 0x3ecfcf : 0xffffff)
 }
-const hands = [0, 1].map(i => {
-  const hand = renderer.xr.getHand(i)
-  const model = createHandModel(i); hand.add(model.group)
-  const ray = makeRayLine(i === 0 ? 0x7b6ef6 : 0x3ecfcf); ray.visible = false; hand.add(ray)
-  const dot = new Mesh(new SphereGeometry(0.008, 8, 8), new MeshBasicMaterial({ color: 0x3ecfcf }))
-  dot.visible = false; hand.add(dot)
-  return { hand, model, ray, dot, side: i, pinchPrev: false }
-})
 
 // ══════════════════════════════════════════════════════════════════════════════
-// EVENT SYSTEM — Spline Loader Event Runner
-// Le loader Spline stocke les events dans entity.data.events (collection
-// Map-like : .forEach() mais ni .length ni Symbol.iterator). Idem pour
-// actions et tweens. On exécute les Transitions via changeSelectedState.
+// POINTEURS XR
+// Un pointeur par source d'entrée (manette OU main). Le rayon utilisé est le
+// targetRaySpace fourni par le système : sur Quest, c'est le rayon officiel
+// de Meta pour les mains (épaule → pincement), stable et précis. Le clic passe
+// par les événements WebXR natifs selectstart/selectend, déclenchés aussi bien
+// par la gâchette que par le pincement pouce-index.
 // ══════════════════════════════════════════════════════════════════════════════
 const raycaster = new Raycaster()
 const _mat = new Matrix4(), _origin = new Vector3(), _dir = new Vector3()
-const _fwd = new Vector3(), _right = new Vector3()
+const _fwd = new Vector3(), _right = new Vector3(), _camPos = new Vector3()
 
-let splineContext = null // { scene, shared, _entityByUuid }
-let meshToEntity = new Map() // mesh uuid → Spline entity with events
+const pointers = [0, 1].map(i => {
+  const color = i === 0 ? 0x7b6ef6 : 0x3ecfcf
+  const ctrl  = renderer.xr.getController(i)      // targetRaySpace
+  const grip  = renderer.xr.getControllerGrip(i)  // gripSpace
+  const hand  = renderer.xr.getHand(i)
+  const model = createControllerModel(i); grip.add(model.group)
+  const handModel = createHandModel(i); hand.add(handModel.group)
+  const ray = makeRayLine(color); ctrl.add(ray)
+  const cursor = makeCursor(color)
+
+  const p = {
+    i, ctrl, grip, hand, model, handModel, ray, cursor,
+    source: null, hit: null, entity: null,
+    hoverEntity: null, pressEntity: null, selecting: false,
+  }
+  ctrl.addEventListener('connected', e => {
+    p.source = e.data
+    model.group.visible = !e.data.hand
+    log('Source connectée', i, e.data.handedness, e.data.hand ? 'main' : 'manette', e.data.targetRayMode)
+  })
+  ctrl.addEventListener('disconnected', () => {
+    setHover(p, null)
+    p.source = null; p.hit = null; p.entity = null; p.selecting = false; p.pressEntity = null
+    ray.visible = false; cursor.group.visible = false
+  })
+  ctrl.addEventListener('selectstart', () => onSelectStart(p))
+  ctrl.addEventListener('selectend',   () => onSelectEnd(p))
+  return p
+})
+
+// ══════════════════════════════════════════════════════════════════════════════
+// EVENT SYSTEM — exécution des événements Spline
+// Le loader stocke les events dans entity.data.events (collection Map-like :
+// .forEach() mais ni .length ni Symbol.iterator). Idem pour actions et tweens.
+// ══════════════════════════════════════════════════════════════════════════════
+let splineContext = null          // { scene, shared } : contexte attendu par le loader
+let meshToEntity = new Map()      // uuid du mesh → entité Spline portant les events
 let interactiveObjects = []
-let currentHoveredUuid = null
+const hoverCount = new Map()      // entité → nombre de pointeurs qui la survolent
 
-// Convertit les collections Spline (Map-like), arrays ou iterables en Array
 function toArray(thing) {
   if (!thing) return []
   if (Array.isArray(thing)) return thing
-  if (typeof thing.forEach === 'function') {
-    const arr = []; thing.forEach(item => arr.push(item)); return arr
-  }
+  if (typeof thing.forEach === 'function') { const arr = []; thing.forEach(item => arr.push(item)); return arr }
   if (typeof thing[Symbol.iterator] === 'function') return [...thing]
   return []
 }
-
 function getEventsArray(obj) { return toArray(obj?.data?.events) }
 function hasEvents(obj) { return getEventsArray(obj).length > 0 }
 
@@ -272,9 +297,7 @@ function collectObjects(splineScene) {
   interactiveObjects = []
   meshToEntity = new Map()
   const entityByUuid = new Map()
-
   splineScene.traverse(obj => { if (obj.uuid) entityByUuid.set(obj.uuid, obj) })
-
   splineScene.traverse(obj => {
     if (!obj.isMesh) return
     interactiveObjects.push(obj)
@@ -283,18 +306,17 @@ function collectObjects(splineScene) {
       if (hasEvents(cur)) { meshToEntity.set(obj.uuid, cur); return }
       cur = cur.parent
     }
-    meshToEntity.set(obj.uuid, obj)
   })
+  splineContext.entityByUuid = entityByUuid
 
-  if (splineContext) splineContext._entityByUuid = entityByUuid
-
-  const withEvents = [...new Set(meshToEntity.values())].filter(hasEvents)
-  console.log('[SplineXR] Meshes:', interactiveObjects.length, '| Entités avec events:', withEvents.length)
-  withEvents.forEach(e => {
-    const types = getEventsArray(e).map(ev => (ev?.data ?? ev)?.type)
-    console.log('  →', e.name, types)
-  })
+  const withEvents = [...new Set(meshToEntity.values())]
+  log('Meshes:', interactiveObjects.length, '| Entités interactives:', withEvents.length)
+  withEvents.forEach(e => log('  →', e.name, getEventsArray(e).map(ev => (ev?.data ?? ev)?.type)))
 }
+
+// Entité interactive touchée (null si le premier objet touché n'a pas d'event :
+// l'occlusion est ainsi respectée)
+function entityOf(hit) { return hit ? (meshToEntity.get(hit.object.uuid) ?? null) : null }
 
 function fireRay(source) {
   _mat.extractRotation(source.matrixWorld)
@@ -305,102 +327,160 @@ function fireRay(source) {
   return hits.length ? hits[0] : null
 }
 
-// ── Action runner ────────────────────────────────────────────────────────────
-function runActions(actions) {
+// ── Audio ────────────────────────────────────────────────────────────────────
+// Le loader embarque Howler : shared.getAudio(id) renvoie un lecteur
+// (play / pause / stop, volume, loop, delay).
+function getSound(id) {
+  const shared = splineContext?.shared
+  if (!id || !shared?.getAudio || !shared.audios?.[id]) return null
+  try { return shared.getAudio(id) } catch (e) { warn('Audio introuvable:', id, e.message); return null }
+}
+
+function runAudioAction(a) {
+  if (a.interaction === 'play') {
+    const s = getSound(a.audio)
+    if (!s) return
+    if (a.volume !== undefined) s.volume = a.volume > 1 ? a.volume / 100 : a.volume
+    if (a.loop !== undefined) s.loop = a.loop
+    if (a.delay !== undefined) s.delay = a.delay
+    if (a.toggle && s.status === 'playing') { s.pause(); log('Audio pause (toggle)', a.audio); return }
+    s.play(); log('Audio play', a.audio)
+  } else if (a.interaction === 'pause' || a.interaction === 'stop') {
+    const ids = [a.audio, a.playAudio].filter(Boolean)
+    const targets = ids.map(getSound).filter(Boolean)
+    // Sans cible explicite, on arrête tous les sons de la scène
+    const list = targets.length ? targets : Object.keys(splineContext?.shared?.audios ?? {}).map(getSound).filter(Boolean)
+    list.forEach(s => a.interaction === 'pause' ? s.pause() : s.stop())
+    log('Audio', a.interaction, ids.join(',') || 'tous')
+  }
+}
+
+function stopAllAudio() {
+  const audios = splineContext?.shared?.audios
+  if (!audios) return
+  Object.values(audios).forEach(s => { try { s?.stop?.() } catch {} })
+}
+
+// ── Exécution des actions ────────────────────────────────────────────────────
+// phase : 'in' (entrée de survol), 'out' (sortie de survol) ou undefined (clic)
+function runActions(actions, phase) {
   if (!actions || !splineContext) return
   for (const action of toArray(actions)) {
     const a = action?.data ?? action
     if (!a) continue
-
-    if (a.type === 'Transition') {
-      const target = splineContext._entityByUuid?.get(a.object)
-      if (!target) { console.warn('[SplineXR] Transition target not found:', a.object); continue }
-
-      // Tweens : [0] = état de départ (souvent null = base), [1] = état cible
-      const states = toArray(a.tweens).map(tw => {
-        const d = tw?.data ?? tw
-        return d?.state !== undefined ? d.state : undefined
-      }).filter(s => s !== undefined)
-
-      let stateId = null
-      if (states.length >= 2) {
-        const currentState = target._currentXRState ?? null
-        const fromState = states[0]
-        const toState = states[states.length - 1]
-        stateId = currentState === toState ? fromState : toState
-        target._currentXRState = stateId
-      } else if (states.length === 1) {
-        stateId = states[0]
-      }
-
-      console.log('[SplineXR] Transition →', target.name, '| state:', stateId, '| states:', JSON.stringify(states))
-      try { target.changeSelectedState(stateId, splineContext, true) }
-      catch(e) { console.warn('[SplineXR] changeSelectedState:', e.message) }
-
-    } else if (a.type === 'Conditional') {
-      if (a.ifActions) runActions(a.ifActions)
-
-    } else if (a.type === 'SetVariable') {
-      if (splineContext.shared && a.variable !== undefined) {
-        try { splineContext.shared.updateVariable(a.variable, a.value) }
-        catch(e) { console.warn('[SplineXR] SetVariable:', e.message) }
-      }
-    } else if (a.type === 'OpenUrl' || a.type === 'URL') {
-      const url = a.url || a.value
-      if (url) window.open(url, '_blank')
-    } else {
-      console.log('[SplineXR] Action non gérée:', a.type, a)
-    }
+    const run = () => runAction(a, phase)
+    // Le délai ne s'applique pas à l'audio, qui le gère lui-même
+    if (a.type !== 'Audio' && a.delay > 0 && phase !== 'out') setTimeout(run, a.delay)
+    else run()
   }
 }
 
-function triggerEvent(entity, eventType) {
+function runAction(a, phase) {
+  if (a.type === 'Transition') {
+    const target = splineContext.entityByUuid?.get(a.object)
+    if (!target) { warn('Cible de transition introuvable:', a.object); return }
+
+    // Tweens : [0] = état de départ (souvent null = état de base), [dernier] = état cible
+    const states = toArray(a.tweens)
+      .map(tw => (tw?.data ?? tw)?.state)
+      .filter(s => s !== undefined)
+    if (!states.length) return
+    const fromState = states.length > 1 ? states[0] : null
+    const toState   = states[states.length - 1]
+
+    let stateId
+    if (phase === 'in') stateId = toState
+    else if (phase === 'out') stateId = fromState
+    else stateId = (target.stateSelection ?? null) === toState ? fromState : toState // clic : bascule
+
+    log('Transition →', target.name, '| état:', stateId, '| phase:', phase ?? 'clic')
+    try { target.changeSelectedState(stateId, splineContext, true) }
+    catch (e) { warn('changeSelectedState:', e.message) }
+
+  } else if (a.type === 'Audio') {
+    // Une sortie de survol ne relance pas un son déclenché à l'entrée
+    if (phase !== 'out') runAudioAction(a)
+
+  } else if (a.type === 'Conditional') {
+    if (a.ifActions) runActions(a.ifActions, phase)
+
+  } else if (a.type === 'SetVariable') {
+    const shared = splineContext.shared
+    if (shared?.updateVariable && a.variable !== undefined) {
+      try { shared.updateVariable(a.variable, a.value) } catch (e) { warn('SetVariable:', e.message) }
+    }
+  } else if (a.type === 'OpenUrl' || a.type === 'URL') {
+    const url = a.url || a.value
+    if (url && phase !== 'out') window.open(url, '_blank')
+  } else {
+    log('Action non gérée:', a.type, a)
+  }
+}
+
+function triggerEvent(entity, eventType, phase) {
   if (!entity) return
   for (const evt of getEventsArray(entity)) {
-    // Deux formats possibles : { type, actions } ou { data: { type, actions } }
     const e = evt?.data ?? evt
     if (!e) continue
-    const type = e.type ?? evt.type
-    if (type !== eventType) continue
+    if ((e.type ?? evt.type) !== eventType) continue
     if (e.disabled || evt.disabled) continue
-    console.log('[SplineXR] ▶', eventType, 'on', entity.name)
-    runActions(e.actions ?? evt.actions)
+    log('▶', eventType, phase ?? '', 'sur', entity.name)
+    runActions(e.actions ?? evt.actions, phase)
   }
 }
 
-// ── Hover / Click dispatch ───────────────────────────────────────────────────
-function updateHover(hit) {
-  const entity = hit ? meshToEntity.get(hit.object.uuid) : null
-  const newUuid = entity?.uuid ?? null
-  if (newUuid === currentHoveredUuid) return
-
-  // Sortie de l'objet précédent (toggle retour)
-  if (currentHoveredUuid) {
-    const prev = splineContext?._entityByUuid?.get(currentHoveredUuid)
-    if (prev) triggerEvent(prev, 'MouseHover')
+// ── Survol : compteur par entité pour que deux pointeurs ne se contredisent pas
+function setHover(p, entity) {
+  if (p.hoverEntity === entity) return
+  const prev = p.hoverEntity
+  if (prev) {
+    const n = (hoverCount.get(prev) ?? 1) - 1
+    if (n <= 0) { hoverCount.delete(prev); triggerEvent(prev, 'MouseHover', 'out') }
+    else hoverCount.set(prev, n)
   }
-  // Entrée sur le nouvel objet
-  if (newUuid && entity) triggerEvent(entity, 'MouseHover')
-  currentHoveredUuid = newUuid
+  if (entity) {
+    const n = (hoverCount.get(entity) ?? 0) + 1
+    hoverCount.set(entity, n)
+    if (n === 1) triggerEvent(entity, 'MouseHover', 'in')
+  }
+  p.hoverEntity = entity
 }
 
-let pressedEntity = null
-
-function onTriggerDown(hit) {
-  if (!hit) return
-  const entity = meshToEntity.get(hit.object.uuid)
-  if (!entity) return
-  pressedEntity = entity
-  triggerEvent(entity, 'MouseDown')
+// ── Clic : gâchette ou pincement ─────────────────────────────────────────────
+function onSelectStart(p) {
+  p.selecting = true
+  // Le rayon a pu ne pas encore être évalué ce frame-ci (pointeur transitoire)
+  if (!p.hit && threeScene) { p.hit = fireRay(p.ctrl); p.entity = entityOf(p.hit) }
+  p.pressEntity = p.entity
+  if (p.entity) triggerEvent(p.entity, 'MouseDown')
 }
 
-function onTriggerUp(hit) {
-  if (pressedEntity) {
-    triggerEvent(pressedEntity, 'MouseUp')
-    // MousePress = cycle complet sur le même objet
-    const curEntity = hit ? meshToEntity.get(hit.object.uuid) : null
-    if (curEntity === pressedEntity) triggerEvent(pressedEntity, 'MousePress')
-    pressedEntity = null
+function onSelectEnd(p) {
+  p.selecting = false
+  const pressed = p.pressEntity
+  p.pressEntity = null
+  if (!pressed) return
+  triggerEvent(pressed, 'MouseUp')
+  if (p.entity === pressed) triggerEvent(pressed, 'MousePress')
+}
+
+// ── Mise à jour visuelle d'un pointeur ───────────────────────────────────────
+function updatePointerVisuals(p) {
+  const { ray, cursor, hit } = p
+  const active = !!p.source && p.source.targetRayMode !== 'screen'
+  ray.visible = active
+  cursor.group.visible = active && !!hit
+  if (!active) return
+  ray.scale.z = hit ? hit.distance : RAY_IDLE_LENGTH
+  ray.material.opacity = p.entity ? 0.85 : 0.4
+  if (hit) {
+    // Curseur au point d'impact, tourné vers la caméra, taille apparente constante
+    cursor.group.position.copy(hit.point)
+    renderer.xr.getCamera().getWorldPosition(_camPos)
+    cursor.group.lookAt(_camPos)
+    const s = hit.distance * CURSOR_ANGULAR * (p.selecting ? 0.7 : 1) * (p.entity ? 1.3 : 1)
+    cursor.group.scale.setScalar(s)
+    cursor.ringMat.opacity = p.entity ? 1 : 0.5
   }
 }
 
@@ -408,7 +488,6 @@ function onTriggerUp(hit) {
 let debugCounter = 0
 function updateControls(dt) {
   if (!renderer.xr.isPresenting) return
-  const session = renderer.xr.getSession()
   const xrCam = renderer.xr.getCamera()
   xrCam.getWorldDirection(_fwd); _fwd.y = 0; _fwd.normalize()
   _right.set(_fwd.z, 0, -_fwd.x)
@@ -420,121 +499,95 @@ function updateControls(dt) {
     if (dist > loco.outOfBoundsRadius && !loco.outOfBoundsShown) { loco.outOfBoundsShown = true; showOutOfBounds() }
     else if (dist <= loco.outOfBoundsRadius) { loco.outOfBoundsShown = false; hideOutOfBounds() }
     if (loco.outOfBoundsShown) {
-      loco.outOfBoundsTimer = (loco.outOfBoundsTimer ?? 0) + dt
+      loco.outOfBoundsTimer += dt
       if (loco.outOfBoundsTimer > 3) { resetCamera(); loco.outOfBoundsTimer = 0 }
     } else loco.outOfBoundsTimer = 0
   }
 
-  // Manettes
-  if (session?.inputSources) {
-    for (const src of session.inputSources) {
-      if (!src.gamepad) continue
-      const side = src.handedness === 'left' ? 0 : 1
-      const { axes, buttons } = src.gamepad
-      const jx = axes[2] ?? axes[0] ?? 0, jy = axes[3] ?? axes[1] ?? 0
-      const trigger = (buttons[0]?.value ?? 0) > 0.5
-      const c = controllers[side]
-      const hit = fireRay(c.ctrl)
+  for (const p of pointers) {
+    const src = p.source
+    if (!src) continue
 
-      // Dot au point d'impact (monde → espace local du contrôleur)
-      c.ray.visible = true
-      if (hit) {
-        c.dot.visible = true
-        const invCtrl = new Matrix4().copy(c.ctrl.matrixWorld).invert()
-        c.dot.position.copy(hit.point).applyMatrix4(invCtrl)
-      } else {
-        c.dot.visible = false
-      }
+    // 1. Rayon système → cible
+    p.hit = fireRay(p.ctrl)
+    p.entity = entityOf(p.hit)
+    setHover(p, p.entity)
+    updatePointerVisuals(p)
 
-      // Debug HUD (toutes les 30 frames, main droite)
-      if (side === 1 && (++debugCounter % 30 === 0)) {
-        if (hit) {
-          let info = `mesh: ${hit.object.name || 'unnamed'}\n`
-          let cur = hit.object, depth = 0
-          while (cur && !cur.isScene && depth < 6) {
-            const d = cur.data
-            const n = getEventsArray(cur).length
-            const keys = d ? Object.keys(d).slice(0, 8).join(',') : 'no data'
-            info += `[${depth}] ${cur.name || '?'} data:${!!d} events:${n} keys:[${keys}]\n`
-            cur = cur.parent; depth++
-          }
-          info += `total meshes:${interactiveObjects.length}`
-          debugLog(info)
-        } else {
-          debugLog(`Ray→ none | meshes:${interactiveObjects.length}`)
-        }
-      }
-
-      if (side === 1) updateHover(hit)
-
-      if (side === 0) {
-        // GAUCHE : smooth locomotion
-        const dx = Math.abs(jx) > loco.deadzone ? jx : 0, dy = Math.abs(jy) > loco.deadzone ? jy : 0
-        if (dx || dy) {
-          cameraRig.position.addScaledVector(_fwd, -dy * loco.speed * dt)
-          cameraRig.position.addScaledVector(_right, -dx * loco.speed * dt)
-        }
-        if (trigger && !c.triggerPrev) onTriggerDown(hit)
-        if (!trigger && c.triggerPrev) onTriggerUp(hit)
-      } else {
-        // DROITE : snap turn + téléport + clic
-        if (loco.snapCooldown <= 0) {
-          if (jx > 0.6) { cameraRig.rotateY(-loco.snapAngle); loco.snapCooldown = loco.snapDelay }
-          else if (jx < -0.6) { cameraRig.rotateY(loco.snapAngle); loco.snapCooldown = loco.snapDelay }
-        }
-        const jyAbs = Math.abs(jy) > loco.deadzone ? jy : 0
-        if (jyAbs > 0.6) {
-          if (hit) { teleportMarker.visible = true; teleportMarker.position.copy(hit.point); loco.teleportPending = true; loco.teleportTarget.copy(hit.point) }
-        } else {
-          if (loco.teleportPending) { cameraRig.position.copy(loco.teleportTarget); loco.teleportPending = false }
-          teleportMarker.visible = false
-        }
-        if (trigger && !c.triggerPrev) onTriggerDown(hit)
-        if (!trigger && c.triggerPrev) onTriggerUp(hit)
-      }
-
-      // Feedback visuel manette
-      if (c.model) {
-        const tv = buttons[0]?.value ?? 0
-        c.model.triggerLight.material.opacity = tv * 0.8
-        if (c.model.stick) { c.model.stick.rotation.x = jy * 0.25; c.model.stick.rotation.z = -jx * 0.25 }
-        const ringMesh = c.model.group.children.find(ch => ch.geometry?.type === 'RingGeometry')
-        if (ringMesh) ringMesh.material.opacity = 0.9 + tv * 0.1
-      }
-      c.triggerPrev = trigger
+    // 2. Main : affichage des articulations
+    if (src.hand) {
+      p.handModel.group.visible = true
+      updateHandModel(p.handModel, p.hand, p.selecting)
+      continue
     }
+    p.handModel.group.visible = false
+
+    // 3. Manette : joysticks (déplacement, rotation, téléport)
+    const gp = src.gamepad
+    if (!gp) continue
+    const jx = gp.axes[2] ?? gp.axes[0] ?? 0
+    const jy = gp.axes[3] ?? gp.axes[1] ?? 0
+    const left = src.handedness === 'left'
+
+    if (left) {
+      const dx = Math.abs(jx) > loco.deadzone ? jx : 0
+      const dy = Math.abs(jy) > loco.deadzone ? jy : 0
+      if (dx || dy) {
+        cameraRig.position.addScaledVector(_fwd, -dy * loco.speed * dt)
+        cameraRig.position.addScaledVector(_right, -dx * loco.speed * dt)
+      }
+    } else {
+      if (loco.snapCooldown <= 0) {
+        if (jx > 0.6)       { cameraRig.rotateY(-loco.snapAngle); loco.snapCooldown = loco.snapDelay }
+        else if (jx < -0.6) { cameraRig.rotateY( loco.snapAngle); loco.snapCooldown = loco.snapDelay }
+      }
+      if (jy < -0.6) {
+        // Joystick poussé vers l'avant : viser le point de téléport
+        if (p.hit) {
+          teleportMarker.visible = true
+          teleportMarker.position.copy(p.hit.point)
+          teleportMarker.scale.setScalar(p.hit.distance * 0.03)
+          loco.teleportPending = true
+          loco.teleportTarget.copy(p.hit.point)
+        }
+      } else {
+        if (loco.teleportPending) { cameraRig.position.copy(loco.teleportTarget); loco.teleportPending = false }
+        teleportMarker.visible = false
+      }
+    }
+
+    // Retour visuel de la manette
+    const tv = gp.buttons[0]?.value ?? 0
+    p.model.triggerLight.material.opacity = tv * 0.8
+    p.model.stick.rotation.x = jy * 0.25
+    p.model.stick.rotation.z = -jx * 0.25
   }
 
-  // Hand tracking
-  for (const h of hands) {
-    const joints = h.hand.joints
-    if (!joints) { h.model.group.visible = false; h.ray.visible = false; h.dot.visible = false; continue }
-    h.model.group.visible = true
-    const iTip = joints['index-finger-tip'], tTip = joints['thumb-tip']
-    let isPinching = false
-    if (iTip && tTip) {
-      _origin.setFromMatrixPosition(iTip.matrixWorld)
-      _dir.setFromMatrixPosition(tTip.matrixWorld)
-      isPinching = _origin.distanceTo(_dir) < 0.03
-    }
-    updateHandModel(h.model, joints, isPinching)
-    const hit = iTip ? fireRay(iTip) : null
-    h.ray.visible = !!hit; h.dot.visible = !!hit
-    if (h.side === 1) updateHover(hit)
-    if (isPinching && !h.pinchPrev && h.side === 1) onTriggerDown(hit)
-    if (!isPinching && h.pinchPrev && h.side === 1) onTriggerUp(hit)
-    h.pinchPrev = isPinching
+  if (DEBUG && (++debugCounter % 20 === 0)) {
+    debugLog(pointers.map(p => {
+      if (!p.source) return `[${p.i}] —`
+      const kind = p.source.hand ? 'main' : 'manette'
+      const target = p.hit ? (p.hit.object.name || 'mesh') : 'rien'
+      return `[${p.i}] ${p.source.handedness} ${kind} ${p.source.targetRayMode}\n    vise: ${target} | entité: ${p.entity?.name ?? '—'}${p.selecting ? ' | PRESS' : ''}`
+    }).join('\n') + `\nmeshes: ${interactiveObjects.length} | survols: ${hoverCount.size}`)
   }
 }
 
 // ── Attach/detach ────────────────────────────────────────────────────────────
 function attachXR(scene) {
   scene.add(cameraRig)
-  controllers.forEach(c => { cameraRig.add(c.ctrl); cameraRig.add(c.grip) })
-  hands.forEach(h => cameraRig.add(h.hand))
+  pointers.forEach(p => {
+    cameraRig.add(p.ctrl, p.grip, p.hand)
+    scene.add(p.cursor.group)
+  })
   scene.add(teleportMarker)
 }
-function detachXR(scene) { scene.remove(cameraRig); scene.remove(teleportMarker) }
+function detachXR(scene) {
+  pointers.forEach(p => { setHover(p, null); scene.remove(p.cursor.group) })
+  hoverCount.clear()
+  scene.remove(cameraRig)
+  scene.remove(teleportMarker)
+}
 
 // ── Out-of-bounds ────────────────────────────────────────────────────────────
 const oobOverlay = document.createElement('div')
@@ -572,7 +625,7 @@ function extractSplineCamera(splineScene) {
   const d = best.data ?? {}
   const fov = d.perspective?.fov ?? best.fov ?? 45
   const zoom = d.perspective?.zoom ?? best.zoom ?? 1
-  console.log('[SplineXR] Caméra:', best.name, '| pos:', pos.toArray().map(v=>Math.round(v)), '| fov:', fov)
+  log('Caméra:', best.name, '| pos:', pos.toArray().map(v => Math.round(v)), '| fov:', fov)
   return { pos, quat, fov, zoom }
 }
 
@@ -591,14 +644,16 @@ function buildScene(splineScene) {
   const dl = new DirectionalLight(0xffffff, 0.8); dl.position.set(300, 600, 400); scene.add(dl)
   scene.add(splineScene)
 
+  // Contexte au format attendu par les entités du loader : { shared, scene }
   const shared = splineScene.sharedAssets ?? splineScene._sharedAssets ?? null
-  splineContext = { scene: splineScene, shared, _entityByUuid: new Map() }
+  if (!shared) warn('sharedAssets introuvable : transitions et audio limités')
+  splineContext = { scene: splineScene, shared, entityByUuid: new Map() }
   collectObjects(splineScene)
 
-  // Événements Start
+  // Événements Start (dont la musique d'ambiance)
   setTimeout(() => {
     if (!splineContext) return
-    for (const [, entity] of splineContext._entityByUuid) {
+    for (const [, entity] of splineContext.entityByUuid) {
       if (hasEvents(entity)) triggerEvent(entity, 'Start')
     }
   }, 200)
@@ -625,7 +680,7 @@ function loadSpline(url) {
   return new Promise((resolve, reject) => {
     const loader = new SplineLoader()
     const orig = Vector3.prototype.copy
-    Vector3.prototype.copy = function(v) { return v == null ? this : orig.call(this, v) }
+    Vector3.prototype.copy = function (v) { return v == null ? this : orig.call(this, v) }
     loader.load(url,
       s => { Vector3.prototype.copy = orig; resolve(s) },
       undefined,
@@ -645,7 +700,7 @@ async function loadScene(url) {
   try {
     const spline = await loadSpline(proxyUrl(url))
     loadMsg.textContent = 'Construction de la scène…'
-    if (threeScene) detachXR(threeScene)
+    if (threeScene) { detachXR(threeScene); stopAllAudio() }
     threeScene = buildScene(spline)
     xrCanvas.classList.add('active')
     resize()
@@ -667,6 +722,7 @@ async function loadScene(url) {
 btnReset.onclick = () => resetCamera()
 btnBack.onclick = () => {
   renderer.setAnimationLoop(null)
+  stopAllAudio()
   if (threeScene) detachXR(threeScene)
   xrCanvas.classList.remove('active'); hudEl.classList.remove('visible')
   btnVr.disabled = true; btnVr.textContent = '🥽 Entrer en VR'

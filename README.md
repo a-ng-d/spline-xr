@@ -18,12 +18,21 @@ En local, le proxy `/spline-proxy/*` n'existe pas : il est fourni par Netlify (`
 
 | Entrée | Action |
 |---|---|
+| Rayon (manette ou main) | Survol Spline (MouseHover) + curseur |
+| Gâchette ou pincement pouce-index | Clic Spline (MouseDown / MouseUp / MousePress) |
 | Joystick gauche | Déplacement |
 | Joystick droit ← → | Rotation par crans |
 | Joystick droit ↑ | Téléportation (relâcher) |
-| Gâchette | Clic Spline (MouseDown / MouseUp / MousePress) |
-| Ray droit | MouseHover |
-| Pincement (main droite) | Clic Spline |
+
+Les mains utilisent le rayon système de Meta (`targetRaySpace`) et le pincement natif WebXR (`selectstart` / `selectend`).
+
+## Audio
+
+Les actions Audio de Spline (play / pause / stop, volume, boucle, délai) sont jouées via le lecteur Howler embarqué dans le loader. La musique d'un événement Start démarre au chargement de la scène.
+
+## Debug
+
+Ajouter `?debug` à l'URL pour afficher le HUD (sources d'entrée, cible visée, survols) et les logs `[SplineXR]` dans la console.
 
 ## Déploiement
 
