@@ -1,0 +1,16 @@
+{
+  "name": "spline-xr-v2",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build"
+  },
+  "dependencies": {
+    "@splinetool/loader": "1.12.81",
+    "super-three": "0.147.1"
+  },
+  "devDependencies": {
+    "vite": "^5.0.0"
+  }
+}

@@ -1,0 +1,14 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+[[redirects]]
+  from = "/spline-proxy/*"
+  to = "https://prod.spline.design/:splat"
+  status = 200
+  force = true
+  [redirects.headers]
+    X-Forwarded-Host = "prod.spline.design"
