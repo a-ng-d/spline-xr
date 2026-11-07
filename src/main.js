@@ -3,11 +3,21 @@ import {
   WebGLRenderer, PerspectiveCamera, Scene, AmbientLight, DirectionalLight,
   Color, Clock, Vector3, Group, Raycaster, Box3,
   BufferGeometry, Float32BufferAttribute, Line, LineBasicMaterial,
-  SphereGeometry, MeshBasicMaterial, Mesh, RingGeometry, Matrix4, CircleGeometry
+  SphereGeometry, MeshBasicMaterial, Mesh, RingGeometry, Matrix4, CircleGeometry,
+  Euler, Quaternion
 } from 'three'
 
-// ── Debug : ajouter ?debug à l'URL pour activer le HUD et les logs ──────────────
-const DEBUG = new URLSearchParams(location.search).has('debug')
+// ── Paramètres d'URL ───────────────────────────────────────────────────────────
+//   ?debug        HUD + logs
+//   ?scale=0.002  échelle de la scène (mètres par unité Spline, défaut 0.001)
+const PARAMS = new URLSearchParams(location.search)
+const DEBUG = PARAMS.has('debug')
+// Les scènes Spline sont exprimées en « pixels » : à 1 unité = 1 mm, une carte
+// de 300 unités mesure 30 cm et la caméra Spline (≈ 800 unités) se retrouve à
+// portée de bras. C'est ce qui rend le poke et la saisie possibles.
+const WORLD_SCALE = parseFloat(PARAMS.get('scale')) || 0.001
+const EYE_HEIGHT = 1.6        // hauteur des yeux supposée en local-floor (m)
+const MIN_SCALE = WORLD_SCALE / 20, MAX_SCALE = WORLD_SCALE * 20
 const log  = (...a) => { if (DEBUG) console.log('[SplineXR]', ...a) }
 const warn = (...a) => console.warn('[SplineXR]', ...a)
 
@@ -113,11 +123,41 @@ renderer.xr.enabled = true
 renderer.setClearColor(new Color('#06060f'))
 
 const cameraRig = new Group()
-const camera = new PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 100000)
+const camera = new PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.01, 2000)
 cameraRig.add(camera)
-cameraRig.position.set(0, 160, 800)
 const clock = new Clock()
 let threeScene = null
+
+// Conteneur de la scène Spline : c'est lui qu'on met à l'échelle, déplace et
+// redimensionne. Le rig (le joueur) reste en mètres.
+const world = new Group()
+
+// Point de vue initial issu de la caméra Spline : position des yeux (monde),
+// lacet du rig, et inclinaison résiduelle utilisée hors VR uniquement.
+const UP = new Vector3(0, 1, 0)
+const view = {
+  eye: new Vector3(0, EYE_HEIGHT, 1),   // monde, scène à sa position par défaut
+  eyeLocal: new Vector3(),              // même point dans le repère de la scène
+  yaw: 0, tilt: new Quaternion(),
+}
+
+// Place le rig pour que les yeux tombent sur view.eye. En VR, le casque ajoute
+// déjà la hauteur de tête (local-floor) : on l'enlève du rig.
+function placeRig() {
+  cameraRig.position.copy(view.eye)
+  if (renderer.xr.isPresenting) cameraRig.position.y -= EYE_HEIGHT
+  cameraRig.quaternion.setFromAxisAngle(UP, view.yaw)
+  if (!renderer.xr.isPresenting) { camera.position.set(0, 0, 0); camera.quaternion.copy(view.tilt) }
+}
+
+function resetWorld() {
+  world.position.set(0, 0, 0)
+  world.quaternion.identity()
+  world.scale.setScalar(WORLD_SCALE)
+}
+
+renderer.xr.addEventListener('sessionstart', placeRig)
+renderer.xr.addEventListener('sessionend', placeRig)
 
 function resize() {
   renderer.setSize(window.innerWidth, window.innerHeight)
@@ -128,11 +168,11 @@ window.addEventListener('resize', resize)
 
 // ══════════════════════════════════════════════════════════════════════════════
 // VISUELS DE POINTAGE
-// Les scènes Spline sont en « pixels » (une carte fait ~300 unités) alors que
-// les manettes sont en mètres : rayon, curseur et marqueur de téléport sont
-// donc mis à l'échelle de la distance pour garder une taille apparente fixe.
+// La scène pouvant être agrandie ou réduite, rayon, curseur et marqueur de
+// téléport sont mis à l'échelle de la distance pour garder une taille
+// apparente fixe.
 // ══════════════════════════════════════════════════════════════════════════════
-const RAY_IDLE_LENGTH = 300   // longueur du rayon sans cible (unités scène)
+const RAY_IDLE_LENGTH = 4     // longueur du rayon sans cible (m)
 const CURSOR_ANGULAR  = 0.012 // taille du curseur ≈ 0,7° de champ de vision
 
 function makeRayLine(color) {
@@ -167,9 +207,10 @@ function makeTeleportMarker() {
 const teleportMarker = makeTeleportMarker()
 
 const loco = {
-  speed: 300, snapAngle: Math.PI / 4, snapCooldown: 0, snapDelay: 0.35,
+  speed: 1.5, snapAngle: Math.PI / 4, snapCooldown: 0, snapDelay: 0.35,
   deadzone: 0.25, teleportPending: false, teleportTarget: new Vector3(),
-  origin: null, outOfBoundsRadius: 0, outOfBoundsShown: false, outOfBoundsTimer: 0,
+  sceneSize: 0,          // plus grande dimension de la scène, en unités Spline
+  outOfBoundsShown: false, outOfBoundsTimer: 0,
 }
 
 function createControllerModel(side) {
@@ -257,6 +298,9 @@ const pointers = [0, 1].map(i => {
     i, ctrl, grip, hand, model, handModel, ray, cursor,
     source: null, hit: null, entity: null,
     hoverEntity: null, pressEntity: null, selecting: false,
+    poking: null,                          // entité touchée du doigt
+    grabbing: false, grabPrev: null,       // saisie de la scène
+    squeezing: false, selectGrab: false,   // origine de la saisie (grip / pincement)
   }
   ctrl.addEventListener('connected', e => {
     p.source = e.data
@@ -264,12 +308,18 @@ const pointers = [0, 1].map(i => {
     log('Source connectée', i, e.data.handedness, e.data.hand ? 'main' : 'manette', e.data.targetRayMode)
   })
   ctrl.addEventListener('disconnected', () => {
+    endPoke(p)
     setHover(p, null)
     p.source = null; p.hit = null; p.entity = null; p.selecting = false; p.pressEntity = null
+    p.squeezing = false; p.selectGrab = false
+    setGrab(p, false)
     ray.visible = false; cursor.group.visible = false
   })
   ctrl.addEventListener('selectstart', () => onSelectStart(p))
   ctrl.addEventListener('selectend',   () => onSelectEnd(p))
+  // Bouton grip des manettes : saisie de la scène, quelle que soit la cible
+  ctrl.addEventListener('squeezestart', () => { p.squeezing = true; setGrab(p, true) })
+  ctrl.addEventListener('squeezeend',   () => { p.squeezing = false; if (!p.selectGrab) setGrab(p, false) })
   return p
 })
 
@@ -448,21 +498,121 @@ function setHover(p, entity) {
 
 // ── Clic : gâchette ou pincement ─────────────────────────────────────────────
 function onSelectStart(p) {
+  if (!threeScene) return
   p.selecting = true
   // Le rayon a pu ne pas encore être évalué ce frame-ci (pointeur transitoire)
-  if (!p.hit && threeScene) { p.hit = fireRay(p.ctrl); p.entity = entityOf(p.hit) }
-  p.pressEntity = p.entity
-  if (p.entity) triggerEvent(p.entity, 'MouseDown')
+  if (!p.hit) { p.hit = fireRay(p.ctrl); p.entity = entityOf(p.hit) }
+  if (p.poking) return            // le doigt est déjà en contact : le poke gère
+  if (p.entity) {
+    p.pressEntity = p.entity
+    triggerEvent(p.entity, 'MouseDown')
+  } else {
+    // Pincement / gâchette dans le vide : on saisit la scène
+    p.selectGrab = true
+    setGrab(p, true)
+  }
 }
 
 function onSelectEnd(p) {
   p.selecting = false
+  if (p.selectGrab) { p.selectGrab = false; if (!p.squeezing) setGrab(p, false) }
   const pressed = p.pressEntity
   p.pressEntity = null
   if (!pressed) return
   triggerEvent(pressed, 'MouseUp')
   if (p.entity === pressed) triggerEvent(pressed, 'MousePress')
 }
+
+// ── Poke : contact du bout de l'index ────────────────────────────────────────
+// On lance un rayon court de la dernière phalange vers le bout du doigt,
+// prolongé de quelques millimètres. Le relâchement demande un retrait plus
+// grand (hystérésis) pour éviter les doubles déclenchements.
+const POKE_DEPTH = 0.008, POKE_RELEASE = 0.02
+const _tip = new Vector3(), _dst = new Vector3(), _pokeDir = new Vector3()
+
+function pokeTest(p) {
+  const tip = p.hand.joints['index-finger-tip']
+  const dst = p.hand.joints['index-finger-phalanx-distal']
+  if (!tip || !dst || !tip.visible || !dst.visible) return null
+  tip.getWorldPosition(_tip); dst.getWorldPosition(_dst)
+  _pokeDir.subVectors(_tip, _dst)
+  const len = _pokeDir.length()
+  if (len < 1e-4) return null
+  _pokeDir.divideScalar(len)
+  raycaster.set(_dst, _pokeDir)
+  raycaster.far = len + (p.poking ? POKE_RELEASE : POKE_DEPTH)
+  const hits = raycaster.intersectObjects(interactiveObjects, true)
+  raycaster.far = Infinity
+  return hits.length ? hits[0] : null
+}
+
+function updatePoke(p) {
+  const entity = p.selecting && !p.poking ? null : entityOf(pokeTest(p))
+  if (entity && !p.poking) {
+    p.poking = entity
+    setHover(p, entity)
+    triggerEvent(entity, 'MouseDown')
+    log('Poke ↓', entity.name)
+  } else if (p.poking && entity !== p.poking) {
+    endPoke(p)
+  }
+}
+
+function endPoke(p) {
+  const e = p.poking
+  if (!e) return
+  p.poking = null
+  triggerEvent(e, 'MouseUp')
+  triggerEvent(e, 'MousePress')
+  log('Poke ↑', e.name)
+}
+
+// ── Saisie de la scène ───────────────────────────────────────────────────────
+// Une main : la scène suit la main. Deux mains : écarter / rapprocher les
+// mains agrandit / réduit la scène autour de leur point milieu.
+const grab = { count: 0, prevDist: 0 }
+const _ga = new Vector3(), _gb = new Vector3(), _gmid = new Vector3(), _gd = new Vector3()
+
+function setGrab(p, on) {
+  p.grabbing = on
+  p.grabPrev = null
+  grab.count = -1                // force la réinitialisation au prochain frame
+}
+
+function updateWorldGrab() {
+  const grabbers = pointers.filter(p => p.grabbing && p.source)
+  if (grabbers.length !== grab.count) {
+    grabbers.forEach(p => { p.grabPrev = null })
+    grab.prevDist = 0
+    grab.count = grabbers.length
+  }
+  if (grabbers.length === 1) {
+    // Position de la main dans le repère du rig : pas de boucle de rétroaction
+    // quand on déplace le rig.
+    const p = grabbers[0]
+    const cur = p.ctrl.position
+    if (p.grabPrev) {
+      _gd.subVectors(cur, p.grabPrev).applyQuaternion(cameraRig.quaternion)
+      cameraRig.position.sub(_gd)
+    }
+    p.grabPrev = (p.grabPrev ?? new Vector3()).copy(cur)
+  } else if (grabbers.length >= 2) {
+    grabbers[0].ctrl.getWorldPosition(_ga)
+    grabbers[1].ctrl.getWorldPosition(_gb)
+    const dist = _ga.distanceTo(_gb)
+    if (grab.prevDist > 1e-3) {
+      let k = dist / grab.prevDist
+      const next = MathClamp(world.scale.x * k, MIN_SCALE, MAX_SCALE)
+      k = next / world.scale.x
+      _gmid.addVectors(_ga, _gb).multiplyScalar(0.5)
+      world.position.sub(_gmid).multiplyScalar(k).add(_gmid)
+      world.scale.setScalar(next)
+      applyLightScale()
+    }
+    grab.prevDist = dist
+  }
+}
+const MathClamp = (v, a, b) => Math.min(b, Math.max(a, v))
 
 // ── Mise à jour visuelle d'un pointeur ───────────────────────────────────────
 function updatePointerVisuals(p) {
@@ -493,11 +643,15 @@ function updateControls(dt) {
   _right.set(_fwd.z, 0, -_fwd.x)
   loco.snapCooldown = Math.max(0, loco.snapCooldown - dt)
 
-  // Out-of-bounds
-  if (loco.origin && loco.outOfBoundsRadius > 0) {
-    const dist = cameraRig.position.distanceTo(loco.origin)
-    if (dist > loco.outOfBoundsRadius && !loco.outOfBoundsShown) { loco.outOfBoundsShown = true; showOutOfBounds() }
-    else if (dist <= loco.outOfBoundsRadius) { loco.outOfBoundsShown = false; hideOutOfBounds() }
+  // Out-of-bounds : distance au point de vue initial, suivi dans le repère de
+  // la scène (qui peut avoir été déplacée ou redimensionnée)
+  if (loco.sceneSize > 0) {
+    world.localToWorld(_oobTarget.copy(view.eyeLocal))
+    _oobRig.copy(cameraRig.position); _oobRig.y += EYE_HEIGHT
+    const radius = Math.max(5, loco.sceneSize * world.scale.x * 5)
+    const dist = _oobRig.distanceTo(_oobTarget)
+    if (dist > radius && !loco.outOfBoundsShown) { loco.outOfBoundsShown = true; showOutOfBounds() }
+    else if (dist <= radius && loco.outOfBoundsShown) { loco.outOfBoundsShown = false; hideOutOfBounds() }
     if (loco.outOfBoundsShown) {
       loco.outOfBoundsTimer += dt
       if (loco.outOfBoundsTimer > 3) { resetCamera(); loco.outOfBoundsTimer = 0 }
@@ -508,13 +662,24 @@ function updateControls(dt) {
     const src = p.source
     if (!src) continue
 
-    // 1. Rayon système → cible
-    p.hit = fireRay(p.ctrl)
-    p.entity = entityOf(p.hit)
-    setHover(p, p.entity)
-    updatePointerVisuals(p)
+    // 1. Main : le contact du doigt passe avant le rayon
+    if (src.hand) updatePoke(p)
 
-    // 2. Main : affichage des articulations
+    // 2. Rayon système → cible (masqué pendant un contact)
+    if (p.poking) {
+      p.hit = null
+      p.entity = p.poking
+      setHover(p, p.poking)
+      p.ray.visible = false
+      p.cursor.group.visible = false
+    } else {
+      p.hit = fireRay(p.ctrl)
+      p.entity = entityOf(p.hit)
+      setHover(p, p.entity)
+      updatePointerVisuals(p)
+    }
+
+    // 3. Main : affichage des articulations
     if (src.hand) {
       p.handModel.group.visible = true
       updateHandModel(p.handModel, p.hand, p.selecting)
@@ -522,7 +687,7 @@ function updateControls(dt) {
     }
     p.handModel.group.visible = false
 
-    // 3. Manette : joysticks (déplacement, rotation, téléport)
+    // 4. Manette : joysticks (déplacement, rotation, téléport)
     const gp = src.gamepad
     if (!gp) continue
     const jx = gp.axes[2] ?? gp.axes[0] ?? 0
@@ -563,15 +728,20 @@ function updateControls(dt) {
     p.model.stick.rotation.z = -jx * 0.25
   }
 
+  // 5. Saisie de la scène (une ou deux mains)
+  updateWorldGrab()
+
   if (DEBUG && (++debugCounter % 20 === 0)) {
     debugLog(pointers.map(p => {
       if (!p.source) return `[${p.i}] —`
       const kind = p.source.hand ? 'main' : 'manette'
-      const target = p.hit ? (p.hit.object.name || 'mesh') : 'rien'
-      return `[${p.i}] ${p.source.handedness} ${kind} ${p.source.targetRayMode}\n    vise: ${target} | entité: ${p.entity?.name ?? '—'}${p.selecting ? ' | PRESS' : ''}`
-    }).join('\n') + `\nmeshes: ${interactiveObjects.length} | survols: ${hoverCount.size}`)
+      const target = p.poking ? 'contact' : p.hit ? (p.hit.object.name || 'mesh') : 'rien'
+      const flags = [p.selecting && 'PRESS', p.poking && 'POKE', p.grabbing && 'GRAB'].filter(Boolean).join(' ')
+      return `[${p.i}] ${p.source.handedness} ${kind} ${p.source.targetRayMode}\n    vise: ${target} | entité: ${p.entity?.name ?? '—'} ${flags}`
+    }).join('\n') + `\nmeshes: ${interactiveObjects.length} | survols: ${hoverCount.size} | échelle: ${(world.scale.x * 1000).toFixed(2)} mm/u`)
   }
 }
+const _oobTarget = new Vector3(), _oobRig = new Vector3()
 
 // ── Attach/detach ────────────────────────────────────────────────────────────
 function attachXR(scene) {
@@ -583,7 +753,7 @@ function attachXR(scene) {
   scene.add(teleportMarker)
 }
 function detachXR(scene) {
-  pointers.forEach(p => { setHover(p, null); scene.remove(p.cursor.group) })
+  pointers.forEach(p => { endPoke(p); setHover(p, null); setGrab(p, false); scene.remove(p.cursor.group) })
   hoverCount.clear()
   scene.remove(cameraRig)
   scene.remove(teleportMarker)
@@ -598,8 +768,9 @@ document.getElementById('oob-reset-btn').onclick = () => resetCamera()
 function showOutOfBounds() { oobOverlay.style.display = 'flex' }
 function hideOutOfBounds() { oobOverlay.style.display = 'none' }
 function resetCamera() {
-  if (!loco.origin) return
-  cameraRig.position.copy(loco.origin); cameraRig.quaternion.copy(loco.originQuat)
+  resetWorld()
+  applyLightScale()
+  placeRig()
   loco.outOfBoundsShown = false; loco.outOfBoundsTimer = 0; hideOutOfBounds()
 }
 
@@ -642,7 +813,14 @@ function buildScene(splineScene) {
 
   scene.add(new AmbientLight(0xffffff, 0.6))
   const dl = new DirectionalLight(0xffffff, 0.8); dl.position.set(300, 600, 400); scene.add(dl)
-  scene.add(splineScene)
+
+  // La scène Spline est placée dans le conteneur mis à l'échelle
+  world.clear()
+  resetWorld()
+  world.add(splineScene)
+  scene.add(world)
+  collectLights(splineScene)
+  applyLightScale()
 
   // Contexte au format attendu par les entités du loader : { shared, scene }
   const shared = splineScene.sharedAssets ?? splineScene._sharedAssets ?? null
@@ -658,22 +836,70 @@ function buildScene(splineScene) {
     }
   }, 200)
 
+  // Point de vue : position et orientation de la caméra Spline (unités Spline,
+  // la scène n'étant pas encore mise à l'échelle au moment de l'extraction)
+  const quat = new Quaternion()
   if (splineCam) {
-    cameraRig.position.copy(splineCam.pos); cameraRig.quaternion.copy(splineCam.quat)
-    camera.fov = splineCam.fov; camera.zoom = splineCam.zoom; camera.updateProjectionMatrix()
+    view.eyeLocal.copy(splineCam.pos)
+    quat.copy(splineCam.quat)
+    camera.fov = splineCam.fov; camera.zoom = splineCam.zoom
   } else {
     const box = new Box3().setFromObject(splineScene)
     const center = box.getCenter(new Vector3()), size = box.getSize(new Vector3())
-    cameraRig.position.set(center.x, center.y, center.z + Math.max(size.x, size.y, size.z) * 1.5)
-    cameraRig.quaternion.identity(); camera.fov = 45; camera.zoom = 1; camera.updateProjectionMatrix()
+    view.eyeLocal.set(center.x, center.y, center.z + Math.max(size.x, size.y, size.z) * 1.5)
+    camera.fov = 45; camera.zoom = 1
   }
+  camera.updateProjectionMatrix()
 
-  loco.origin = cameraRig.position.clone(); loco.originQuat = cameraRig.quaternion.clone()
-  const sz = new Box3().setFromObject(splineScene).getSize(new Vector3())
-  loco.outOfBoundsRadius = Math.max(sz.x, sz.y, sz.z) * 5
+  // En VR, seul le lacet est appliqué au rig (le sol doit rester horizontal) ;
+  // tangage et roulis ne servent qu'à la vue hors casque.
+  const e = new Euler().setFromQuaternion(quat, 'YXZ')
+  view.yaw = e.y
+  view.tilt.setFromEuler(new Euler(e.x, 0, e.z, 'YXZ'))
+  world.updateMatrixWorld(true)
+  view.eye.copy(view.eyeLocal).applyMatrix4(world.matrixWorld)
+  placeRig()
+
+  const sz = new Box3().setFromObject(splineScene).getSize(new Vector3()).divideScalar(WORLD_SCALE)
+  loco.sceneSize = Math.max(sz.x, sz.y, sz.z)
+  log('Échelle:', WORLD_SCALE, 'm/u | taille scène:', Math.round(loco.sceneSize), 'u ≈', (loco.sceneSize * WORLD_SCALE).toFixed(2), 'm')
 
   attachXR(scene)
   return scene
+}
+
+// ── Lumières : les distances d'atténuation ne suivent pas l'échelle du parent,
+// on les recalcule pour garder l'éclairage authored dans Spline.
+let sceneLights = []
+function collectLights(root) {
+  sceneLights = []
+  root.traverse(o => {
+    if (!o.isLight) return
+    const c = o.shadow?.camera
+    sceneLights.push({
+      light: o,
+      distance: o.distance ?? 0,
+      cam: c ? { near: c.near, far: c.far, left: c.left, right: c.right, top: c.top, bottom: c.bottom } : null,
+    })
+  })
+  lastLightScale = 0
+}
+let lastLightScale = 0
+function applyLightScale() {
+  const s = world.scale.x
+  if (s === lastLightScale) return
+  lastLightScale = s
+  for (const { light, distance, cam: base } of sceneLights) {
+    if (distance) light.distance = distance * s
+    const cam = light.shadow?.camera
+    if (!cam || !base) continue
+    cam.near = base.near * s; cam.far = base.far * s
+    if (cam.isOrthographicCamera) {
+      cam.left = base.left * s; cam.right = base.right * s
+      cam.top = base.top * s; cam.bottom = base.bottom * s
+    }
+    cam.updateProjectionMatrix()
+  }
 }
 
 function loadSpline(url) {
