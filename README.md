@@ -14,6 +14,16 @@ npm run build    # build dans dist/
 
 En local, le proxy `/spline-proxy/*` n'existe pas : il est fourni par Netlify (`netlify.toml`). Utiliser `netlify dev` pour le reproduire.
 
+## Accueil
+
+Trois blocs, toujours visibles (même logique que Spline AR) :
+
+- **Nouvelle scène** : URL d'export Spline (obligatoire), titre et lien du fichier Spline (facultatifs).
+- **Pour commencer** : les modèles (iObeya VR, Minecraft VR), avec « Jouer » et « Spline ↗ » pour ouvrir la scène d'origine.
+- **Mes créations** : les scènes jouées depuis le formulaire, enregistrées dans le navigateur (`src/works.js`), avec Jouer / Spline ↗ / Modifier / Supprimer.
+
+Pas de compte : le lien est la seule source de vérité. Une création = son lien `/s/<id>?t=<titre>&f=<fichier Spline>`. Ouvrir un lien partagé puis « ✎ Modifier » le reprend dans Mes créations, sur n'importe quel appareil.
+
 ## Liens partageables
 
 Chaque scène a une adresse : `https://spline-xr.netlify.app/s/<identifiant>`, où l'identifiant est celui de l'URL d'export Spline (`https://prod.spline.design/<identifiant>/scene.splinecode`).
@@ -21,6 +31,7 @@ Chaque scène a une adresse : `https://spline-xr.netlify.app/s/<identifiant>`, o
 - Coller l'URL d'export dans l'accueil charge la scène et met l'adresse à jour.
 - Le bouton **Copier le lien** donne l'adresse à partager.
 - Le lien fonctionne sur ordinateur (aperçu) comme dans le casque (bouton VR).
+- Le titre (`t`) et le fichier Spline d'origine (`f`) voyagent dans le lien : `/s/<identifiant>?t=Ma%20scène&f=<uuid du fichier>`.
 - `?scene=<URL ou identifiant>` est aussi accepté et converti en `/s/<identifiant>`.
 
 Aucune base de données : le lien est l'enregistrement. Il pointe toujours vers la dernière version exportée de la scène dans Spline ; si l'export public est retiré, le lien ne charge plus.
