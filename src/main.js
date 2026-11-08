@@ -972,6 +972,7 @@ async function loadScene(input, { fromRoute = false } = {}) {
     })
     loadingEl.classList.remove('visible')
     hudEl.classList.add('visible')
+    showShareBar(id)
     checkXR()
   } catch (err) {
     console.error('[SplineXR]', err)
@@ -991,6 +992,7 @@ function closeScene() {
   btnVr.disabled = true; btnVr.textContent = '🥽 Entrer en VR'
   configEl.classList.remove('out'); goBtn.disabled = false; threeScene = null
   currentSceneId = null
+  hideShareBar()
   debugEl.style.display = 'none'
 }
 
@@ -1008,18 +1010,33 @@ window.addEventListener('popstate', () => {
   else if (!id && threeScene) closeScene()
 })
 
-// ── Bouton « Copier le lien » ────────────────────────────────────────────────
-const btnShare = document.createElement('button')
-btnShare.className = 'hud-btn'; btnShare.id = 'btn-share'
-btnShare.textContent = '🔗 Copier le lien'
-btnReset.after(btnShare)
-btnShare.onclick = async () => {
+// ── Bandeau « Lien de la scène » ─────────────────────────────────────────────
+const shareBar  = document.getElementById('share-bar')
+const shareLink = document.getElementById('share-url')
+const shareCopy = document.getElementById('share-copy')
+
+function showShareBar(id) {
+  const link = shareUrl(id)
+  shareLink.href = link
+  shareLink.textContent = link.replace(/^https?:\/\//, '')
+  shareCopy.textContent = 'Copier'; shareCopy.classList.remove('done')
+  shareBar.classList.add('visible')
+}
+function hideShareBar() { shareBar.classList.remove('visible') }
+
+shareCopy.onclick = async () => {
   if (!currentSceneId) return
   const link = shareUrl(currentSceneId)
   let ok = false
   try { await navigator.clipboard.writeText(link); ok = true } catch {}
-  btnShare.textContent = ok ? '✓ Lien copié' : link.replace(/^https?:\/\//, '')
-  setTimeout(() => { btnShare.textContent = '🔗 Copier le lien' }, ok ? 2000 : 8000)
+  if (!ok) {
+    // Presse-papiers indisponible : on sélectionne le lien pour un copier manuel
+    const r = document.createRange(); r.selectNodeContents(shareLink)
+    const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r)
+  }
+  shareCopy.textContent = ok ? '✓ Copié' : 'Ctrl+C'
+  shareCopy.classList.toggle('done', ok)
+  setTimeout(() => { shareCopy.textContent = 'Copier'; shareCopy.classList.remove('done') }, 2000)
 }
 
 // ── Ouverture directe d'un lien /s/<id> ──────────────────────────────────────

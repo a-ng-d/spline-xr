@@ -129,7 +129,7 @@ input[type=text].error { border-color: var(--danger); animation: shake .3s }
 /* --- HUD --- */
 #hud {
   position: fixed; bottom: 28px; left: 0; right: 0; z-index: 20;
-  display: none; justify-content: center; gap: 12px;
+  display: none; justify-content: center; gap: 12px; padding: 0 16px;
 }
 #hud.visible { display: flex }
 .hud-btn {
@@ -146,6 +146,32 @@ input[type=text].error { border-color: var(--danger); animation: shake .3s }
 #btn-reset:hover { background: rgba(62,207,207,.2) }
 #btn-vr { background: rgba(123,110,246,.15); border-color: rgba(123,110,246,.4); color: var(--accent) }
 #btn-vr:hover:not(:disabled) { background: rgba(123,110,246,.3) }
+
+/* --- Lien partageable --- */
+#share-bar {
+  position: fixed; top: 16px; left: 50%; transform: translateX(-50%); z-index: 20;
+  display: none; align-items: center; gap: 10px;
+  max-width: calc(100% - 32px);
+  background: rgba(6,6,15,.8); border: 1px solid var(--border);
+  backdrop-filter: blur(20px); border-radius: 100px;
+  padding: 6px 6px 6px 18px;
+}
+#share-bar.visible { display: flex }
+#share-label { font-size: 11px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); white-space: nowrap }
+#share-url {
+  font-family: monospace; font-size: 13px; color: var(--text);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; user-select: all;
+  text-decoration: none; min-width: 0;
+}
+#share-url:hover { color: var(--accent) }
+#share-copy {
+  flex-shrink: 0; border: 1px solid rgba(123,110,246,.4); background: rgba(123,110,246,.15);
+  color: var(--accent); border-radius: 100px; padding: 8px 16px;
+  font-size: 13px; font-weight: 600; cursor: pointer; font-family: var(--font); transition: all .2s;
+}
+#share-copy:hover { background: rgba(123,110,246,.3) }
+#share-copy.done { border-color: rgba(62,207,207,.4); background: rgba(62,207,207,.15); color: var(--accent2) }
+@media (max-width: 560px) { #share-label { display: none } }
 
 /* --- Erreur --- */
 #err-bar {
@@ -209,6 +235,12 @@ input[type=text].error { border-color: var(--danger); animation: shake .3s }
   <button class="hud-btn" id="btn-back">← Changer de scène</button>
   <button class="hud-btn" id="btn-reset">⌂ Reset position</button>
   <button class="hud-btn" id="btn-vr" disabled>🥽 Entrer en VR</button>
+</div>
+
+<div id="share-bar">
+  <span id="share-label">Lien de la scène</span>
+  <a id="share-url" href="#" target="_blank" rel="noopener"></a>
+  <button id="share-copy">Copier</button>
 </div>
 
 <div id="err-bar"></div>
