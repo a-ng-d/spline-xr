@@ -4,6 +4,18 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>SplineXR</title>
+<meta name="description" content="Explore des scènes 3D Spline dans le navigateur ou en VR sur casque Meta Quest.">
+<!-- Balises d'aperçu : réécrites pour chaque lien /s/<id> par netlify/edge-functions/og.js -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="SplineXR">
+<meta property="og:url" content="https://spline-xr.netlify.app/">
+<meta property="og:title" content="SplineXR — tes scènes Spline en VR">
+<meta property="og:description" content="Explore des scènes 3D Spline dans le navigateur ou en VR sur casque Meta Quest.">
+<meta property="og:image" content="https://spline-xr.netlify.app/og-default.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://spline-xr.netlify.app/og-default.jpg">
 <style>
 :root {
   --bg: #06060f;
@@ -170,6 +182,12 @@ input[type=text].error { border-color: var(--danger); animation: shake .3s }
   font-size: 13px; font-weight: 600; cursor: pointer; font-family: var(--font); transition: all .2s;
 }
 #share-copy:hover { background: rgba(123,110,246,.3) }
+#share-thumb {
+  flex-shrink: 0; border: 1px solid var(--border); background: var(--surface); color: var(--text);
+  border-radius: 100px; width: 38px; height: 36px; font-size: 14px; cursor: pointer; transition: all .2s;
+}
+#share-thumb:hover:not(:disabled) { border-color: var(--accent) }
+#share-thumb:disabled { opacity: .6; cursor: default }
 #share-copy.done { border-color: rgba(62,207,207,.4); background: rgba(62,207,207,.15); color: var(--accent2) }
 @media (max-width: 560px) { #share-label { display: none } }
 
@@ -240,6 +258,7 @@ input[type=text].error { border-color: var(--danger); animation: shake .3s }
 <div id="share-bar">
   <span id="share-label">Lien de la scène</span>
   <a id="share-url" href="#" target="_blank" rel="noopener"></a>
+  <button id="share-thumb" title="Utiliser la vue actuelle comme aperçu du lien">📷</button>
   <button id="share-copy">Copier</button>
 </div>
 

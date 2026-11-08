@@ -25,6 +25,17 @@ Chaque scène a une adresse : `https://spline-xr.netlify.app/s/<identifiant>`, o
 
 Aucune base de données : le lien est l'enregistrement. Il pointe toujours vers la dernière version exportée de la scène dans Spline ; si l'export public est retiré, le lien ne charge plus.
 
+### Aperçu des liens (réseaux sociaux, portfolio)
+
+Partagé sur LinkedIn, Slack, un portfolio…, un lien `/s/<identifiant>` affiche une image de la scène.
+
+- À la première ouverture d'une scène qui n'a pas encore d'aperçu, l'app photographie la vue de départ (1200×630) et l'envoie à `/api/thumb/<identifiant>` (`netlify/functions/thumb.mjs`), qui la range dans Netlify Blobs. Pas de base de données.
+- Le bouton 📷 du bandeau remplace l'aperçu par la vue actuelle (hors VR).
+- `netlify/edge-functions/og.js` réécrit les balises Open Graph de la page pour chaque lien.
+- Sans aperçu, l'image par défaut `public/og-default.jpg` est utilisée.
+
+N'importe qui ouvrant le lien peut remplacer l'aperçu. Les fonctions Netlify ne tournent qu'avec un déploiement depuis le dépôt (pas avec un glisser-déposer du dossier `dist`).
+
 ## Contrôles VR
 
 | Entrée | Action |

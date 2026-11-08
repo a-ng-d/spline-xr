@@ -969,10 +969,12 @@ async function loadScene(input, { fromRoute = false } = {}) {
     renderer.setAnimationLoop(() => {
       updateControls(clock.getDelta())
       renderer.render(threeScene, camera)
+      if (thumbRequest) takeThumbnail()
     })
     loadingEl.classList.remove('visible')
     hudEl.classList.add('visible')
     showShareBar(id)
+    scheduleThumbnail(id)
     checkXR()
   } catch (err) {
     console.error('[SplineXR]', err)
@@ -1010,10 +1012,75 @@ window.addEventListener('popstate', () => {
   else if (!id && threeScene) closeScene()
 })
 
+// ── Aperçu du lien (image Open Graph) ────────────────────────────────────────
+// À la première ouverture d'une scène sans aperçu, on photographie la vue
+// initiale (1200×630) et on l'envoie à /api/thumb/<id> (Netlify Blobs).
+const THUMB_W = 1200, THUMB_H = 630, THUMB_MAX = 480 * 1024
+let thumbRequest = null   // { id, resolve } : capture à faire au prochain rendu
+
+async function thumbnailExists(id) {
+  const r = await fetch(`/api/thumb/${id}?exists=1`, { cache: 'no-store' })
+  if (!r.ok || !(r.headers.get('content-type') ?? '').includes('json')) throw new Error('API indisponible')
+  return (await r.json()).exists
+}
+
+// Capture au prochain rendu ; résout avec true si l'envoi a réussi
+function requestThumbnail(id) {
+  return new Promise(resolve => {
+    if (renderer.xr.isPresenting || currentSceneId !== id) return resolve(false)
+    thumbRequest = { id, resolve }
+  })
+}
+
+function scheduleThumbnail(id) {
+  thumbnailExists(id).then(exists => {
+    if (exists) return
+    // Laisse le temps aux textures de se charger
+    setTimeout(() => { if (currentSceneId === id) requestThumbnail(id).then(ok => log('Aperçu créé:', ok)) }, 2500)
+  }).catch(e => log('Aperçu ignoré:', e.message))
+}
+
+// Appelée dans la boucle, juste après renderer.render()
+function takeThumbnail() {
+  const { id, resolve } = thumbRequest
+  thumbRequest = null
+  if (renderer.xr.isPresenting || currentSceneId !== id) return resolve(false)
+  const src = renderer.domElement
+  const c = document.createElement('canvas'); c.width = THUMB_W; c.height = THUMB_H
+  const ctx = c.getContext('2d')
+  ctx.fillStyle = '#06060f'; ctx.fillRect(0, 0, THUMB_W, THUMB_H)
+  // Recadrage « cover » centré
+  const k = Math.max(THUMB_W / src.width, THUMB_H / src.height)
+  const w = src.width * k, h = src.height * k
+  ctx.drawImage(src, (THUMB_W - w) / 2, (THUMB_H - h) / 2, w, h)
+  uploadThumbnail(id, c).then(resolve, e => { warn('Aperçu non envoyé:', e.message); resolve(false) })
+}
+
+async function uploadThumbnail(id, canvas) {
+  let blob = null
+  for (const q of [0.85, 0.72, 0.6]) {
+    blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', q))
+    if (blob && blob.size <= THUMB_MAX) break
+  }
+  if (!blob || blob.size > THUMB_MAX) throw new Error('image trop lourde')
+  const r = await fetch(`/api/thumb/${id}`, { method: 'PUT', headers: { 'Content-Type': 'image/jpeg' }, body: blob })
+  if (!r.ok) throw new Error(`HTTP ${r.status}`)
+  return true
+}
+
 // ── Bandeau « Lien de la scène » ─────────────────────────────────────────────
 const shareBar  = document.getElementById('share-bar')
 const shareLink = document.getElementById('share-url')
 const shareCopy = document.getElementById('share-copy')
+const shareThumb = document.getElementById('share-thumb')
+shareThumb.onclick = async () => {
+  if (!currentSceneId || shareThumb.disabled) return
+  shareThumb.disabled = true; shareThumb.textContent = '…'
+  const ok = await requestThumbnail(currentSceneId)
+  shareThumb.textContent = ok ? '✓' : '✕'
+  shareThumb.title = ok ? 'Aperçu mis à jour' : 'Échec : réessaie hors VR, une fois le site en ligne'
+  setTimeout(() => { shareThumb.textContent = '📷'; shareThumb.title = 'Utiliser la vue actuelle comme aperçu du lien'; shareThumb.disabled = false }, 2500)
+}
 
 function showShareBar(id) {
   const link = shareUrl(id)
