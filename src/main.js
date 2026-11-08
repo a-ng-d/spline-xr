@@ -22,9 +22,18 @@ const log  = (...a) => { if (DEBUG) console.log('[SplineXR]', ...a) }
 const warn = (...a) => console.warn('[SplineXR]', ...a)
 
 // ── Constantes ─────────────────────────────────────────────────────────────────
+// url : export public à jouer ; source : fichier d'origine à consulter dans Spline
 const SCENES = [
-  { name: 'iObeya vVR', url: 'https://prod.spline.design/h7gKpO9w4utya2UU/scene.splinecode' },
-  { name: 'Streamr',    url: 'https://prod.spline.design/eekFw3BQ0ebdE9ze/scene.splinecode' },
+  {
+    name: 'iObeya VR',
+    url: 'https://prod.spline.design/h7gKpO9w4utya2UU/scene.splinecode',
+    source: 'https://app.spline.design/file/2120202b-13d1-42f7-8b1b-fc1b5d21ffba',
+  },
+  {
+    name: 'Minecraft VR',
+    url: 'https://prod.spline.design/mFRY0tOewmI6FvRK/scene.splinecode',
+    source: 'https://app.spline.design/file/5f421421-186f-481d-a837-d467713b081b',
+  },
 ]
 const LS_KEY = 'spline-xr-v2-scenes'
 const getSaved = () => { try { return JSON.parse(localStorage.getItem(LS_KEY) || '[]') } catch { return [] } }
@@ -111,10 +120,20 @@ function sceneIdFromLocation() {
 }
 
 SCENES.forEach(s => {
+  const row = document.createElement('div'); row.className = 'scene-row'
   const btn = document.createElement('button'); btn.className = 'scene-btn'
   const slug = s.url.replace('https://prod.spline.design/', '').replace('/scene.splinecode', '')
-  btn.innerHTML = `<div><div class="scene-name">${s.name}</div><div class="scene-slug">${slug}</div></div><span class="scene-arrow">▶</span>`
-  btn.onclick = () => loadScene(s.url); sceneList.appendChild(btn)
+  btn.innerHTML = `<div><div class="scene-name">${s.name}</div><div class="scene-slug">${slug}</div></div><span class="scene-arrow">▶ Jouer</span>`
+  btn.onclick = () => loadScene(s.url)
+  row.appendChild(btn)
+  if (s.source) {
+    const src = document.createElement('a'); src.className = 'scene-source'
+    src.href = s.source; src.target = '_blank'; src.rel = 'noopener'
+    src.title = 'Voir la scène d\'origine dans Spline'
+    src.textContent = 'Spline ↗'
+    row.appendChild(src)
+  }
+  sceneList.appendChild(row)
 })
 
 function renderMyScenes() {

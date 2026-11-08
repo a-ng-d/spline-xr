@@ -85,7 +85,16 @@ h1 span { color: var(--accent) }
 .scene-btn:active { transform: scale(.99) }
 .scene-name { font-size: 13px; font-weight: 500 }
 .scene-slug { font-size: 11px; color: var(--muted); margin-top: 2px; font-family: monospace }
-.scene-arrow { color: var(--accent); font-size: 11px; opacity: .7 }
+.scene-arrow { color: var(--accent); font-size: 11px; font-weight: 600; opacity: .8; white-space: nowrap }
+.scene-row { display: flex; gap: 6px }
+.scene-row .scene-btn { flex: 1; min-width: 0 }
+.scene-source {
+  display: flex; align-items: center; flex-shrink: 0;
+  border: 1px solid var(--border); border-radius: 10px; padding: 0 14px;
+  font-size: 12px; font-weight: 600; color: var(--muted); text-decoration: none;
+  transition: color .15s, border-color .15s, background .15s;
+}
+.scene-source:hover { color: var(--accent2); border-color: var(--accent2); background: rgba(62,207,207,.08) }
 
 .divider { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 11px }
 .divider::before,.divider::after { content:''; flex:1; height:1px; background:var(--border) }
