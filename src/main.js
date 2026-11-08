@@ -84,6 +84,32 @@ function showErr(msg) {
 }
 const proxyUrl = url => url.replace('https://prod.spline.design/', '/spline-proxy/')
 
+// ── Liens partageables ─────────────────────────────────────────────────────────
+// Une scène = son identifiant Spline. Le lien /s/<id> suffit pour la rouvrir :
+// pas de base de données, l'URL est l'enregistrement.
+const SCENE_ID_RE = /^[A-Za-z0-9_-]{6,64}$/
+const sceneUrlFromId = id => `https://prod.spline.design/${id}/scene.splinecode`
+
+// Accepte : URL prod Spline, lien /s/<id> de l'app, ou identifiant seul
+function parseSceneId(input) {
+  const s = (input || '').trim()
+  let m = s.match(/prod\.spline\.design\/([A-Za-z0-9_-]+)/) || s.match(/\/s\/([A-Za-z0-9_-]+)/)
+  const id = m ? m[1] : s
+  return SCENE_ID_RE.test(id) ? id : null
+}
+
+// Conserve ?debug / ?scale d'une page à l'autre
+const routeUrl = path => path + location.search
+const shareUrl = id => `${location.origin}/s/${id}`
+let currentSceneId = null
+
+function sceneIdFromLocation() {
+  const m = location.pathname.match(/^\/s\/([A-Za-z0-9_-]+)\/?$/)
+  if (m && SCENE_ID_RE.test(m[1])) return m[1]
+  const q = PARAMS.get('scene')
+  return q ? parseSceneId(q) : null
+}
+
 SCENES.forEach(s => {
   const btn = document.createElement('button'); btn.className = 'scene-btn'
   const slug = s.url.replace('https://prod.spline.design/', '').replace('/scene.splinecode', '')
@@ -108,8 +134,10 @@ function renderMyScenes() {
 renderMyScenes()
 saveBtn.onclick = () => {
   const url = urlInput.value.trim()
-  if (!url.startsWith('http')) { urlInput.classList.add('error'); setTimeout(() => urlInput.classList.remove('error'), 500); return }
-  const saved = getSaved(); if (!saved.includes(url)) { saved.push(url); setSaved(saved) }; renderMyScenes()
+  const id = parseSceneId(url)
+  if (!id) { urlInput.classList.add('error'); setTimeout(() => urlInput.classList.remove('error'), 500); return }
+  const full = sceneUrlFromId(id)
+  const saved = getSaved(); if (!saved.includes(full)) { saved.push(full); setSaved(saved) }; renderMyScenes()
 }
 goBtn.onclick = () => loadScene(urlInput.value.trim())
 urlInput.addEventListener('keydown', e => e.key === 'Enter' && loadScene(urlInput.value.trim()))
@@ -916,15 +944,23 @@ function loadSpline(url) {
   })
 }
 
-async function loadScene(url) {
-  if (!url.startsWith('http')) {
-    urlInput.classList.add('error'); setTimeout(() => urlInput.classList.remove('error'), 500); return
+// input : URL Spline, lien /s/<id> ou identifiant. fromRoute : chargé depuis
+// l'adresse de la page (ne pas réécrire l'historique).
+async function loadScene(input, { fromRoute = false } = {}) {
+  const id = parseSceneId(input)
+  if (!id) {
+    urlInput.classList.add('error'); setTimeout(() => urlInput.classList.remove('error'), 500)
+    if (fromRoute) showErr('Lien de scène invalide')
+    return
   }
+  const url = sceneUrlFromId(id)
   goBtn.disabled = true; errBar.classList.remove('visible')
   configEl.classList.add('out'); loadingEl.classList.add('visible')
   loadMsg.textContent = 'Chargement Spline…'
   try {
     const spline = await loadSpline(proxyUrl(url))
+    currentSceneId = id
+    if (!fromRoute && location.pathname !== `/s/${id}`) history.pushState({ id }, '', routeUrl(`/s/${id}`))
     loadMsg.textContent = 'Construction de la scène…'
     if (threeScene) { detachXR(threeScene); stopAllAudio() }
     threeScene = buildScene(spline)
@@ -941,19 +977,63 @@ async function loadScene(url) {
     console.error('[SplineXR]', err)
     loadingEl.classList.remove('visible'); configEl.classList.remove('out')
     goBtn.disabled = false
-    showErr('Erreur : ' + (err.message || 'impossible de charger'))
+    if (fromRoute) { urlInput.value = url; history.replaceState(null, '', routeUrl('/')) }
+    showErr('Erreur : ' + (err.message || 'impossible de charger') +
+      (fromRoute ? ' — la scène est-elle bien exportée en URL publique dans Spline ?' : ''))
   }
 }
 
-btnReset.onclick = () => resetCamera()
-btnBack.onclick = () => {
+function closeScene() {
   renderer.setAnimationLoop(null)
   stopAllAudio()
   if (threeScene) detachXR(threeScene)
   xrCanvas.classList.remove('active'); hudEl.classList.remove('visible')
   btnVr.disabled = true; btnVr.textContent = '🥽 Entrer en VR'
   configEl.classList.remove('out'); goBtn.disabled = false; threeScene = null
+  currentSceneId = null
   debugEl.style.display = 'none'
+}
+
+btnReset.onclick = () => resetCamera()
+btnBack.onclick = () => {
+  if (renderer.xr.isPresenting) renderer.xr.getSession()?.end()
+  closeScene()
+  if (location.pathname !== '/') history.pushState(null, '', routeUrl('/'))
+}
+
+// Précédent / suivant du navigateur
+window.addEventListener('popstate', () => {
+  const id = sceneIdFromLocation()
+  if (id && id !== currentSceneId) loadScene(id, { fromRoute: true })
+  else if (!id && threeScene) closeScene()
+})
+
+// ── Bouton « Copier le lien » ────────────────────────────────────────────────
+const btnShare = document.createElement('button')
+btnShare.className = 'hud-btn'; btnShare.id = 'btn-share'
+btnShare.textContent = '🔗 Copier le lien'
+btnReset.after(btnShare)
+btnShare.onclick = async () => {
+  if (!currentSceneId) return
+  const link = shareUrl(currentSceneId)
+  let ok = false
+  try { await navigator.clipboard.writeText(link); ok = true } catch {}
+  btnShare.textContent = ok ? '✓ Lien copié' : link.replace(/^https?:\/\//, '')
+  setTimeout(() => { btnShare.textContent = '🔗 Copier le lien' }, ok ? 2000 : 8000)
+}
+
+// ── Ouverture directe d'un lien /s/<id> ──────────────────────────────────────
+{
+  const id = sceneIdFromLocation()
+  if (id) {
+    // ?scene=<id> est normalisé en /s/<id>
+    if (!location.pathname.startsWith('/s/')) {
+      const q = new URLSearchParams(location.search); q.delete('scene')
+      const qs = q.toString()
+      history.replaceState({ id }, '', `/s/${id}${qs ? '?' + qs : ''}`)
+    }
+    loadScene(id, { fromRoute: true })
+  }
 }
 
 async function checkXR() {

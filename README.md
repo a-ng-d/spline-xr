@@ -14,6 +14,17 @@ npm run build    # build dans dist/
 
 En local, le proxy `/spline-proxy/*` n'existe pas : il est fourni par Netlify (`netlify.toml`). Utiliser `netlify dev` pour le reproduire.
 
+## Liens partageables
+
+Chaque scène a une adresse : `https://spline-xr.netlify.app/s/<identifiant>`, où l'identifiant est celui de l'URL d'export Spline (`https://prod.spline.design/<identifiant>/scene.splinecode`).
+
+- Coller l'URL d'export dans l'accueil charge la scène et met l'adresse à jour.
+- Le bouton **Copier le lien** donne l'adresse à partager.
+- Le lien fonctionne sur ordinateur (aperçu) comme dans le casque (bouton VR).
+- `?scene=<URL ou identifiant>` est aussi accepté et converti en `/s/<identifiant>`.
+
+Aucune base de données : le lien est l'enregistrement. Il pointe toujours vers la dernière version exportée de la scène dans Spline ; si l'export public est retiré, le lien ne charge plus.
+
 ## Contrôles VR
 
 | Entrée | Action |

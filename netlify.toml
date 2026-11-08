@@ -12,3 +12,9 @@
   force = true
   [redirects.headers]
     X-Forwarded-Host = "prod.spline.design"
+
+# Liens partageables : /s/<identifiant Spline> sert l'application
+[[redirects]]
+  from = "/s/*"
+  to = "/index.html"
+  status = 200
