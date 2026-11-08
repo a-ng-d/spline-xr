@@ -8,6 +8,10 @@ import {
 } from 'three'
 import { readScenePath, scenePath, saveWork, sceneUrlFromId, fileUrlFromId } from './works.js'
 import { initHome } from './home.js'
+import {
+  playTransition, playTimeline, evaluateExpression, coerceForVariable,
+  updateAnimations, stopAllAnimations,
+} from './animate.js'
 
 // ── Paramètres d'URL ───────────────────────────────────────────────────────────
 //   ?debug        HUD + logs
@@ -405,14 +409,16 @@ function stopAllAudio() {
 
 // ── Exécution des actions ────────────────────────────────────────────────────
 // phase : 'in' (entrée de survol), 'out' (sortie de survol) ou undefined (clic)
+// Actions qui gèrent elles-mêmes leur délai
+const SELF_DELAYED = new Set(['Audio', 'Transition', 'TimelineAnimation'])
+
 function runActions(actions, phase) {
   if (!actions || !splineContext) return
   for (const action of toArray(actions)) {
     const a = action?.data ?? action
-    if (!a) continue
-    const run = () => runAction(a, phase)
-    // Le délai ne s'applique pas à l'audio, qui le gère lui-même
-    if (a.type !== 'Audio' && a.delay > 0 && phase !== 'out') setTimeout(run, a.delay)
+    if (!a || a.disabled) continue
+    const run = () => { try { runAction(a, phase) } catch (e) { warn('Action', a.type, ':', e.message) } }
+    if (!SELF_DELAYED.has(a.type) && a.delay > 0 && phase !== 'out') setTimeout(run, a.delay)
     else run()
   }
 }
@@ -421,42 +427,63 @@ function runAction(a, phase) {
   if (a.type === 'Transition') {
     const target = splineContext.entityByUuid?.get(a.object)
     if (!target) { warn('Cible de transition introuvable:', a.object); return }
-
-    // Tweens : [0] = état de départ (souvent null = état de base), [dernier] = état cible
-    const states = toArray(a.tweens)
-      .map(tw => (tw?.data ?? tw)?.state)
-      .filter(s => s !== undefined)
-    if (!states.length) return
-    const fromState = states.length > 1 ? states[0] : null
-    const toState   = states[states.length - 1]
-
-    let stateId
-    if (phase === 'in') stateId = toState
-    else if (phase === 'out') stateId = fromState
-    else stateId = (target.stateSelection ?? null) === toState ? fromState : toState // clic : bascule
-
-    log('Transition →', target.name, '| état:', stateId, '| phase:', phase ?? 'clic')
-    try { target.changeSelectedState(stateId, splineContext, true) }
-    catch (e) { warn('changeSelectedState:', e.message) }
+    log('Transition →', target.name, '| phase:', phase ?? 'clic')
+    // Animée : durée, délai, courbe, répétition (animate.js)
+    playTransition(a, target, phase, splineContext, toArray)
 
   } else if (a.type === 'Audio') {
     // Une sortie de survol ne relance pas un son déclenché à l'entrée
     if (phase !== 'out') runAudioAction(a)
 
   } else if (a.type === 'Conditional') {
-    if (a.ifActions) runActions(a.ifActions, phase)
+    // Comme le runtime : expression vide ou illisible → aucune branche
+    let ok
+    try { ok = evaluateExpression(a.condition, splineContext.shared) } catch (e) { warn('Condition illisible:', e.message) }
+    if (ok === undefined) return
+    log('Condition →', !!ok)
+    runActions(ok ? a.ifActions : a.elseActions, phase)
 
   } else if (a.type === 'SetVariable') {
-    const shared = splineContext.shared
-    if (shared?.updateVariable && a.variable !== undefined) {
-      try { shared.updateVariable(a.variable, a.value) } catch (e) { warn('SetVariable:', e.message) }
-    }
-  } else if (a.type === 'OpenUrl' || a.type === 'URL') {
-    const url = a.url || a.value
-    if (url && phase !== 'out') window.open(url, '_blank')
+    if (phase === 'out') return
+    setVariable(a.variableId, a.expression)
+
+  } else if (a.type === 'TimelineAnimation') {
+    if (phase === 'out') return
+    playTimeline(a, {
+      root: splineContext.scene, entityByUuid: splineContext.entityByUuid, toArray, log, warn,
+    })
+
+  } else if (a.type === 'OpenUrl' || a.type === 'URL' || a.type === 'Link') {
+    const url = a.url || a.value || a.link
+    if (url && phase !== 'out') window.open(url, '_blank', 'noopener')
   } else {
     log('Action non gérée:', a.type, a)
   }
+}
+
+// ── Variables ────────────────────────────────────────────────────────────────
+let variableDepth = 0
+function setVariable(id, expression) {
+  const shared = splineContext?.shared
+  if (!id || !shared?.updateVariable) return
+  let value
+  try { value = evaluateExpression(expression, shared) } catch (e) { warn('Expression illisible:', e.message); return }
+  if (value === undefined) return
+  let current
+  try { current = shared.getVariable(id) } catch { current = undefined }
+  try { shared.updateVariable(id, coerceForVariable(current, value)) } catch (e) { warn('Variable', id, ':', e.message); return }
+  log('Variable', id, '=', value)
+  // Événements « Changement de variable » (garde-fou contre les boucles)
+  if (variableDepth > 8) return
+  variableDepth++
+  try {
+    for (const [, entity] of splineContext.entityByUuid) {
+      for (const evt of getEventsArray(entity)) {
+        const e = evt?.data ?? evt
+        if (e?.type === 'VariableChange' && e.variableId === id && !e.disabled) runActions(e.actions, undefined)
+      }
+    }
+  } finally { variableDepth-- }
 }
 
 function triggerEvent(entity, eventType, phase) {
@@ -819,6 +846,10 @@ function buildScene(splineScene) {
   if (!shared) warn('sharedAssets introuvable : transitions et audio limités')
   splineContext = { scene: splineScene, shared, entityByUuid: new Map() }
   collectObjects(splineScene)
+  // Variables liées à des propriétés d'objets : le loader a besoin d'un contexte
+  // { scene.find(uuid), shared } qu'il ne crée pas lui-même
+  if (typeof splineScene.find !== 'function') splineScene.find = id => splineContext.entityByUuid.get(id)
+  try { shared?.setEntityOpContext?.(splineContext) } catch (e) { warn('Contexte des variables:', e.message) }
 
   // Événements Start (dont la musique d'ambiance)
   setTimeout(() => {
@@ -939,6 +970,7 @@ async function loadScene(scene, { fromRoute = false, save = false, editKey = nul
       resize()
       renderer.setAnimationLoop(() => {
         updateControls(clock.getDelta())
+        updateAnimations(performance.now())
         renderer.render(threeScene, camera)
         if (thumbRequest) takeThumbnail()
       })
@@ -968,7 +1000,7 @@ async function loadScene(scene, { fromRoute = false, save = false, editKey = nul
 // Arrête le moteur en cours, quel qu'il soit
 function teardownEngines() {
   renderer.setAnimationLoop(null)
-  if (threeScene) { detachXR(threeScene); stopAllAudio(); threeScene = null }
+  if (threeScene) { detachXR(threeScene); stopAllAudio(); stopAllAnimations(); threeScene = null }
   xrCanvas.classList.remove('active')
   if (preview) { preview.dispose(); preview = null }
   thumbRequest?.resolve(false); thumbRequest = null

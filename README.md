@@ -35,17 +35,21 @@ Le runtime Spline ne peut pas tourner en VR : Spline a retiré le module WebXR d
 
 ### Compatibilité du moteur maison (VR)
 
+Le moteur maison (`src/animate.js`) reprend les courbes, unités et calendriers du runtime `@splinetool/runtime` 2.0.151.
+
 | Élément Spline | Runtime Spline | Moteur maison |
 |---|---|---|
 | Géométrie, matériaux, lumières | ✅ | ✅ (rendu du loader, légères différences possibles) |
 | Post-effets (bloom, profondeur de champ, vignette…) | ✅ | ❌ |
 | Événements Survol, Clic (down / up / press), Start | ✅ | ✅ rayon, gâchette, pincement, poke |
-| Action Transition vers un état | ✅ animée | ⚠️ instantanée, sans l'animation |
+| Action Transition vers un état | ✅ | ✅ animée : durée, délai, 9 courbes (dont ressort et bézier), étapes, répétition, aller-retour. Position, rotation, échelle, couleurs et opacité interpolées ; une taille de forme change d'un coup |
 | Action Audio (play / pause / stop) | ✅ | ✅ |
 | Action Lien (Open URL) | ✅ | ✅ |
-| Action Condition | ✅ | ⚠️ branche « si » toujours exécutée, condition non évaluée |
-| Action Variable | ✅ | ⚠️ non vérifié |
-| Animations de timeline, boucles automatiques | ✅ | ❌ |
+| Action Condition (si / sinon) | ✅ | ✅ expressions avec variables, propriétés d'objets, comparaisons, and / or / not (sans API, webhook ni IA) |
+| Action Variable, événement Changement de variable | ✅ | ✅ |
+| Action Timeline (play / pause / stop) | ✅ | ⚠️ pistes position, rotation, échelle (fidèles) et opacité (approchée) ; matériau, taille de forme, lumière, caméra, cloner ignorés |
+| Animations des modèles importés (action Animation) | ✅ | ❌ |
+| Événements Distance et État | ✅ | ❌ |
 | Clavier (Key Down / Up), Scroll, Glisser-déposer | ✅ | ❌ |
 | Look At / Follow (suivi du curseur) | ✅ | ❌ |
 | Physique, collisions, Distance | ✅ | ❌ |
