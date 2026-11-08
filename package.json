@@ -10,6 +10,7 @@
     "@netlify/blobs": "^11.1.8",
     "@netlify/functions": "^6.1.1",
     "@splinetool/loader": "1.12.81",
+    "@splinetool/runtime": "2.0.151",
     "super-three": "0.147.1"
   },
   "devDependencies": {

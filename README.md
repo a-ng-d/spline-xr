@@ -24,6 +24,35 @@ Trois blocs, toujours visibles (même logique que Spline AR) :
 
 Pas de compte : le lien est la seule source de vérité. Une création = son lien `/s/<id>?t=<titre>&f=<fichier Spline>`. Ouvrir un lien partagé puis « ✎ Modifier » le reprend dans Mes créations, sur n'importe quel appareil.
 
+## Deux moteurs
+
+| Situation | Moteur |
+|---|---|
+| Pas de casque (ordinateur, mobile) | **Runtime officiel Spline** : rendu et interactions exacts, à la souris |
+| Casque détecté (navigateur du Meta Quest) | **Moteur maison** : `@splinetool/loader` + WebXR + exécution maison des événements |
+
+Le runtime Spline ne peut pas tourner en VR : Spline a retiré le module WebXR de son three.js embarqué (`setSession` lève « WebXR is not supported by the Spline runtime »). Forcer un moteur : `?mode=spline` ou `?mode=vr`.
+
+### Compatibilité du moteur maison (VR)
+
+| Élément Spline | Runtime Spline | Moteur maison |
+|---|---|---|
+| Géométrie, matériaux, lumières | ✅ | ✅ (rendu du loader, légères différences possibles) |
+| Post-effets (bloom, profondeur de champ, vignette…) | ✅ | ❌ |
+| Événements Survol, Clic (down / up / press), Start | ✅ | ✅ rayon, gâchette, pincement, poke |
+| Action Transition vers un état | ✅ animée | ⚠️ instantanée, sans l'animation |
+| Action Audio (play / pause / stop) | ✅ | ✅ |
+| Action Lien (Open URL) | ✅ | ✅ |
+| Action Condition | ✅ | ⚠️ branche « si » toujours exécutée, condition non évaluée |
+| Action Variable | ✅ | ⚠️ non vérifié |
+| Animations de timeline, boucles automatiques | ✅ | ❌ |
+| Clavier (Key Down / Up), Scroll, Glisser-déposer | ✅ | ❌ |
+| Look At / Follow (suivi du curseur) | ✅ | ❌ |
+| Physique, collisions, Distance | ✅ | ❌ |
+| Contrôles de jeu, changement de scène, création / destruction d'objets | ✅ | ❌ |
+| Particules, vidéo, champs de texte, API / IA | ✅ | ❓ non testé, probablement statique ou absent |
+| Caméra Spline (orbite, zoom) | ✅ | Remplacée par la locomotion VR ; la caméra Spline donne le point de départ |
+
 ## Liens partageables
 
 Chaque scène a une adresse : `https://spline-xr.netlify.app/s/<identifiant>`, où l'identifiant est celui de l'URL d'export Spline (`https://prod.spline.design/<identifiant>/scene.splinecode`).

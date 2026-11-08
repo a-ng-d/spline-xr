@@ -12,6 +12,7 @@ import { initHome } from './home.js'
 // ── Paramètres d'URL ───────────────────────────────────────────────────────────
 //   ?debug        HUD + logs
 //   ?scale=0.002  échelle de la scène (mètres par unité Spline, défaut 0.001)
+//   ?mode=spline  forcer l'aperçu runtime Spline ; ?mode=vr forcer le moteur maison
 const PARAMS = new URLSearchParams(location.search)
 const DEBUG = PARAMS.has('debug')
 // Les scènes Spline sont exprimées en « pixels » : à 1 unité = 1 mm, une carte
@@ -76,7 +77,7 @@ const proxyUrl = url => url.replace('https://prod.spline.design/', '/spline-prox
 // ── Liens partageables ─────────────────────────────────────────────────────────
 // Une scène = son lien /s/<id>?t=<titre>&f=<fichier Spline> : pas de base de
 // données, l'URL est l'enregistrement (voir works.js).
-const KEEP_PARAMS = ['debug', 'scale']   // conservés d'une page à l'autre
+const KEEP_PARAMS = ['debug', 'scale', 'mode']   // conservés d'une page à l'autre
 function routeUrl(path) {
   const qs = KEEP_PARAMS.filter(k => PARAMS.has(k))
     .map(k => PARAMS.get(k) ? `${k}=${encodeURIComponent(PARAMS.get(k))}` : k).join('&')
@@ -85,6 +86,22 @@ function routeUrl(path) {
 const shareUrl = scene => location.origin + scenePath(scene)
 const sceneFromLocation = () => readScenePath(location.href)
 let currentScene = null   // { id, t, f }
+
+// ── Choix du moteur ─────────────────────────────────────────────────────────────
+// Pas de casque : runtime officiel Spline (rendu et interactions exacts, à la
+// souris). Casque détecté : moteur maison (loader + WebXR).
+let xrSupport = null
+async function hasHeadset() {
+  const forced = PARAMS.get('mode')
+  if (forced === 'vr') return true
+  if (forced === 'spline') return false
+  if (xrSupport === null) {
+    xrSupport = !!(await navigator.xr?.isSessionSupported('immersive-vr').catch(() => false))
+  }
+  return xrSupport
+}
+let preview = null        // aperçu runtime Spline en cours
+const sceneOpen = () => !!(threeScene || preview)
 
 // Accueil : formulaire, « Pour commencer », « Mes créations »
 const home = initHome({ onPlay: (scene, opts) => loadScene(scene, opts) })
@@ -900,27 +917,44 @@ async function loadScene(scene, { fromRoute = false, save = false, editKey = nul
   configEl.classList.add('out'); loadingEl.classList.add('visible')
   loadMsg.textContent = 'Chargement Spline…'
   try {
-    const spline = await loadSpline(proxyUrl(sceneUrlFromId(scene.id)))
+    const headset = await hasHeadset()
+    const src = proxyUrl(sceneUrlFromId(scene.id))
+    let spline = null, nextPreview = null
+    if (headset) spline = await loadSpline(src)
+    else {
+      // Chargé à la demande : le casque n'a jamais besoin du runtime Spline
+      const { createSplinePreview } = await import('./spline-preview.js')
+      nextPreview = await createSplinePreview(src, document.body)
+    }
     currentScene = scene
     if (save) { saveWork({ key: editKey, scene }); home.resetForm() }
     const url = routeUrl(scenePath(scene))
     if (!fromRoute && location.pathname + location.search !== url) history.pushState(null, '', url)
     document.title = scene.t ? `${scene.t} — SplineXR` : 'SplineXR'
     loadMsg.textContent = 'Construction de la scène…'
-    if (threeScene) { detachXR(threeScene); stopAllAudio() }
-    threeScene = buildScene(spline)
-    xrCanvas.classList.add('active')
-    resize()
-    renderer.setAnimationLoop(() => {
-      updateControls(clock.getDelta())
-      renderer.render(threeScene, camera)
-      if (thumbRequest) takeThumbnail()
-    })
+    teardownEngines()
+    if (headset) {
+      threeScene = buildScene(spline)
+      xrCanvas.classList.add('active')
+      resize()
+      renderer.setAnimationLoop(() => {
+        updateControls(clock.getDelta())
+        renderer.render(threeScene, camera)
+        if (thumbRequest) takeThumbnail()
+      })
+      btnReset.hidden = false
+      checkXR()
+    } else {
+      preview = nextPreview
+      btnReset.hidden = true   // la caméra est celle de la scène Spline
+      btnVr.disabled = true
+      btnVr.textContent = '🖱 Aperçu Spline · pas de casque'
+      btnVr.title = 'Ouvre ce lien dans le navigateur du Meta Quest pour la VR'
+    }
     loadingEl.classList.remove('visible')
     hudEl.classList.add('visible')
     showShareBar(scene)
     scheduleThumbnail(scene.id)
-    checkXR()
   } catch (err) {
     console.error('[SplineXR]', err)
     loadingEl.classList.remove('visible'); configEl.classList.remove('out')
@@ -931,11 +965,18 @@ async function loadScene(scene, { fromRoute = false, save = false, editKey = nul
   }
 }
 
-function closeScene() {
+// Arrête le moteur en cours, quel qu'il soit
+function teardownEngines() {
   renderer.setAnimationLoop(null)
-  stopAllAudio()
-  if (threeScene) detachXR(threeScene)
-  xrCanvas.classList.remove('active'); hudEl.classList.remove('visible')
+  if (threeScene) { detachXR(threeScene); stopAllAudio(); threeScene = null }
+  xrCanvas.classList.remove('active')
+  if (preview) { preview.dispose(); preview = null }
+  thumbRequest?.resolve(false); thumbRequest = null
+}
+
+function closeScene() {
+  teardownEngines()
+  hudEl.classList.remove('visible')
   btnVr.disabled = true; btnVr.textContent = '🥽 Entrer en VR'
   configEl.classList.remove('out'); goBtn.disabled = false; threeScene = null
   currentScene = null
@@ -963,8 +1004,8 @@ btnEdit.onclick = () => { const s = currentScene; goHome(); if (s) home.editScen
 window.addEventListener('popstate', () => {
   const s = sceneFromLocation()
   if (s && s.id !== currentScene?.id) loadScene(s, { fromRoute: true })
-  else if (s && threeScene) { currentScene = s; showShareBar(s) }
-  else if (!s && threeScene) closeScene()
+  else if (s && sceneOpen()) { currentScene = s; showShareBar(s) }
+  else if (!s && sceneOpen()) closeScene()
 })
 
 // ── Aperçu du lien (image Open Graph) ────────────────────────────────────────
@@ -983,6 +1024,9 @@ async function thumbnailExists(id) {
 function requestThumbnail(id) {
   return new Promise(resolve => {
     if (renderer.xr.isPresenting || currentScene?.id !== id) return resolve(false)
+    // Runtime Spline : tampon conservé, capture immédiate
+    if (preview) return captureCanvas(id, preview.canvas, resolve)
+    // Moteur maison : au prochain rendu (tampon WebGL non conservé)
     thumbRequest = { id, resolve }
   })
 }
@@ -1000,7 +1044,11 @@ function takeThumbnail() {
   const { id, resolve } = thumbRequest
   thumbRequest = null
   if (renderer.xr.isPresenting || currentScene?.id !== id) return resolve(false)
-  const src = renderer.domElement
+  captureCanvas(id, renderer.domElement, resolve)
+}
+
+function captureCanvas(id, src, resolve) {
+  if (!src.width || !src.height) return resolve(false)
   const c = document.createElement('canvas'); c.width = THUMB_W; c.height = THUMB_H
   const ctx = c.getContext('2d')
   ctx.fillStyle = '#06060f'; ctx.fillRect(0, 0, THUMB_W, THUMB_H)
