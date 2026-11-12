@@ -1,12 +1,12 @@
-// « Mes créations » (repris de Spline AR) : scènes enregistrées dans le navigateur.
+// "My creations" (from Spline AR): scenes saved in the browser.
 //
-// Le lien de partage est la seule source de vérité : une création = le chemin de
-// son lien, /s/<id>?t=<titre>&f=<fichier Spline>. Tout le reste s'en déduit.
-// Pas de compte : les créations restent dans ce navigateur. Le lien lui-même sert
-// de sauvegarde : l'ouvrir puis « Modifier » le reprend dans Mes créations.
+// The share link is the single source of truth: a creation = the path of its
+// link, /s/<id>?t=<title>&f=<Spline file>. Everything else is derived from it.
+// No account: creations stay in this browser. The link itself is the backup:
+// opening it then "Edit" brings it back into My creations.
 
 const KEY = 'spline-xr-creations'
-const LEGACY_KEY = 'spline-xr-v2-scenes'   // ancienne liste « Mes scènes » (URLs)
+const LEGACY_KEY = 'spline-xr-v2-scenes'   // former "My scenes" list (URLs)
 
 export const SCENE_ID_RE = /^[A-Za-z0-9_-]{6,64}$/
 const FILE_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -15,7 +15,7 @@ const TITLE_MAX = 80
 export const sceneUrlFromId = id => `https://prod.spline.design/${id}/scene.splinecode`
 export const fileUrlFromId = f => `https://app.spline.design/file/${f}`
 
-// Accepte : URL prod Spline, lien /s/<id> de l'app, ou identifiant seul
+// Accepts: Spline prod URL, the app's /s/<id> link, or a bare ID
 export function parseSceneId(input) {
   const s = (input || '').trim()
   const m = s.match(/prod\.spline\.design\/([A-Za-z0-9_-]+)/) || s.match(/\/s\/([A-Za-z0-9_-]+)/)
@@ -23,7 +23,7 @@ export function parseSceneId(input) {
   return SCENE_ID_RE.test(id) ? id : null
 }
 
-// Accepte : lien app.spline.design/file/<uuid> ou l'uuid seul
+// Accepts: app.spline.design/file/<uuid> link or the bare uuid
 export function parseFileId(input) {
   const s = (input || '').trim()
   const m = s.match(/spline\.design\/file\/([0-9a-f-]{36})/i)
@@ -42,7 +42,7 @@ export function scenePath({ id, t, f }) {
   return `/s/${id}${qs ? '?' + qs : ''}`
 }
 
-// Chemin ou URL complète → { id, t, f } (null si invalide)
+// Path or full URL → { id, t, f } (null if invalid)
 export function readScenePath(pathOrUrl) {
   let u
   try { u = new URL(pathOrUrl, location.origin) } catch { return null }
@@ -65,7 +65,7 @@ function write(list) {
 const newKey = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6)
 const sceneOf = w => readScenePath(w.path)?.id
 
-// Reprise de l'ancienne liste « Mes scènes » (une seule fois)
+// Migrates the former "My scenes" list (once)
 ;(function migrateLegacy() {
   let legacy
   try { legacy = JSON.parse(localStorage.getItem(LEGACY_KEY) || 'null') } catch { return }
@@ -89,13 +89,13 @@ export function findWorkByScene(id) {
   return read().find(w => sceneOf(w) === id) || null
 }
 
-// Crée ou met à jour ; une seule création par scène Spline. Renvoie la clé.
+// Creates or updates; one creation per Spline scene. Returns the key.
 export function saveWork({ key, scene }) {
   const path = scenePath(scene)
   const now = Date.now()
   let list = read()
   let work = key && list.find(w => w.key === key)
-  // Une autre création pointe déjà vers cette scène : on fusionne
+  // Another creation already points to this scene: merge them
   const twin = list.find(w => sceneOf(w) === scene.id && w !== work)
   if (twin) {
     if (work) list = list.filter(w => w !== twin)
@@ -117,16 +117,7 @@ export function deleteWork(key) {
   write(read().filter(w => w.key !== key))
 }
 
-export function timeAgo(ts) {
-  const s = Math.round((Date.now() - ts) / 1000)
-  if (s < 60) return 'à l\'instant'
-  if (s < 3600) return `il y a ${Math.round(s / 60)} min`
-  if (s < 86400) return `il y a ${Math.round(s / 3600)} h`
-  const d = Math.round(s / 86400)
-  return d < 30 ? `il y a ${d} j` : new Date(ts).toLocaleDateString('fr-FR')
-}
-
-// Synchronisation entre onglets
+// Sync between tabs
 export function onWorksChanged(fn) {
   window.addEventListener('works-changed', fn)
   window.addEventListener('storage', e => { if (e.key === KEY) fn() })

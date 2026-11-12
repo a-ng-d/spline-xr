@@ -1,6 +1,31 @@
 {
-  "name": "spline-xr-v2",
+  "name": "spline-xr",
   "version": "1.0.0",
+  "description": "Open-source WebXR for students: play Spline scenes in VR on Meta Quest with a simple link. Spline runtime preview without a headset, EN/FR.",
+  "license": "MIT",
+  "author": "a-ng-d",
+  "homepage": "https://spline-xr.netlify.app",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/a-ng-d/spline-xr.git"
+  },
+  "bugs": {
+    "url": "https://github.com/a-ng-d/spline-xr/issues"
+  },
+  "keywords": [
+    "webxr",
+    "virtual-reality",
+    "vr",
+    "meta-quest",
+    "spline",
+    "three.js",
+    "hand-tracking",
+    "education",
+    "design",
+    "tolgee",
+    "i18n"
+  ],
+  "private": true,
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -11,6 +36,7 @@
     "@netlify/functions": "^6.1.1",
     "@splinetool/loader": "1.12.81",
     "@splinetool/runtime": "2.0.151",
+    "@tolgee/web": "^7.3.0",
     "super-three": "0.147.1"
   },
   "devDependencies": {

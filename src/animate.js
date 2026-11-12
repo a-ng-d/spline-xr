@@ -1,22 +1,22 @@
-// Moteur d'animation maison : reproduit, pour le loader Spline (qui ne lit que les
-// données), ce que fait le runtime officiel pour
-//   - les transitions animées entre états (durée, délai, courbe, répétition) ;
-//   - l'évaluation des conditions et des variables ;
-//   - la lecture des animations de timeline.
-// Les valeurs (courbes, unités, ordre d'application) sont reprises du code du
+// Home-made animation engine: reproduces, for the Spline loader (which only reads
+// data), what the official runtime does for
+//   - animated transitions between states (duration, delay, easing, repeat);
+//   - evaluating conditions and variables;
+//   - playing timeline animations.
+// Values (easings, units, order of application) are taken from the code of the
 // runtime @splinetool/runtime 2.0.151.
 
 // ══════════════════════════════════════════════════════════════════════════════
 // COURBES
 // ══════════════════════════════════════════════════════════════════════════════
-// Identifiants Spline : 0 linéaire, 1 ease, 2 ease-in, 3 ease-out, 4 ease-in-out,
-// 5 bézier personnalisée, 6 ressort, 7 « arc », 8 sans transition (saut).
+// Spline IDs: 0 linear, 1 ease, 2 ease-in, 3 ease-out, 4 ease-in-out,
+// 5 custom bezier, 6 spring, 7 "arc", 8 none (step).
 const PRESETS = {
   0: [0, 0, 1, 1], 1: [0.25, 0.1, 0.25, 1], 2: [0.42, 0, 1, 1],
   3: [0, 0, 0.58, 1], 4: [0.42, 0, 0.58, 1], 7: [0.25, 1, 0.5, 1],
 }
 
-// Bézier cubique (0,0)-(x1,y1)-(x2,y2)-(1,1), résolue en x par Newton + dichotomie
+// Cubic bezier (0,0)-(x1,y1)-(x2,y2)-(1,1), solved for x with Newton + bisection
 function cubicBezier(x1, y1, x2, y2) {
   if (x1 === y1 && x2 === y2) return t => t
   const cx = 3 * x1, bx = 3 * (x2 - x1) - cx, ax = 1 - cx - bx
@@ -45,7 +45,7 @@ function cubicBezier(x1, y1, x2, y2) {
   return x => (x <= 0 ? 0 : x >= 1 ? 1 : sy(solve(x)))
 }
 
-// Ressort amorti (masse, raideur, amortissement, vitesse), normalisé pour finir à 1
+// Damped spring (mass, stiffness, damping, velocity), normalised to end at 1
 function spring({ mass = 1, stiffness = 80, damping = 10, velocity = 0 } = {}) {
   const w0 = Math.sqrt(stiffness / mass)
   const zeta = damping / (2 * Math.sqrt(stiffness * mass))
@@ -80,7 +80,7 @@ export function makeEase(d = {}) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// HORLOGE : animations en cours, avancées à chaque image par update()
+// CLOCK: running animations, advanced every frame by update()
 // ══════════════════════════════════════════════════════════════════════════════
 const active = new Set()
 
@@ -97,7 +97,7 @@ export function stopAllAnimations() {
   timelines.clear()
 }
 
-// Joue une interpolation 0 → 1 : apply(p) à chaque image, puis onEnd()
+// Plays a 0 → 1 interpolation: apply(p) every frame, then onEnd()
 function tween({ delay = 0, duration, ease, apply, onEnd, key }) {
   const anim = {
     key, cancelled: false, start: null,
@@ -114,9 +114,9 @@ function tween({ delay = 0, duration, ease, apply, onEnd, key }) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// TRANSITIONS ENTRE ÉTATS
-// Le loader applique un état d'un coup (changeSelectedState). On capture
-// l'apparence avant et après, puis on interpole entre les deux.
+// TRANSITIONS BETWEEN STATES
+// The loader applies a state at once (changeSelectedState). The look before
+// and after is captured, then interpolated.
 // ══════════════════════════════════════════════════════════════════════════════
 const isVec = v => v && (v.isColor || v.isVector2 || v.isVector3 || v.isVector4)
 
@@ -150,7 +150,7 @@ function writeMat(m, k, v) {
   else m[k] = v
 }
 
-// Paires (avant, après) pour tout ce qui existe des deux côtés
+// (before, after) pairs for everything that exists on both sides
 function pairUp(from, to) {
   const objs = [], mats = []
   for (const [o, b] of to.objects) { const a = from.objects.get(o); if (a) objs.push({ o, a, b }) }
@@ -188,9 +188,9 @@ function applyPairs({ objs, mats }, p) {
   }
 }
 
-const running = new WeakMap()   // entité → animation de transition en cours
+const running = new WeakMap()   // entity → running transition animation
 
-// Change d'état en douceur. timing : { duration (ms), delay (ms), ease }
+// Changes state smoothly. timing: { duration (ms), delay (ms), ease }
 function animateState(entity, stateId, ctx, timing) {
   return new Promise(resolve => {
     running.get(entity)?.anim && (running.get(entity).anim.cancelled = true)
@@ -211,9 +211,9 @@ function animateState(entity, stateId, ctx, timing) {
 }
 
 /**
- * Action Transition de Spline.
- * a.tweens : [0] état de départ + réglages (délai, répétition, sens), [1..] étapes
- * (état cible, durée, courbe). phase : 'in' (entrée), 'out' (sortie), sinon clic.
+ * Spline Transition action.
+ * a.tweens: [0] start state + settings (delay, repeat, direction), [1..] steps
+ * (target state, duration, easing). phase: 'in' (enter), 'out' (leave), else click.
  */
 export function playTransition(a, target, phase, ctx, toArray) {
   const tweens = toArray(a.tweens).map(tw => tw?.data ?? tw).filter(Boolean)
@@ -225,7 +225,7 @@ export function playTransition(a, target, phase, ctx, toArray) {
   const states = tweens.map(t => t.state ?? null)
   const last = states[states.length - 1]
   const step = (i, dir) => {
-    // Étape vers l'état i ; durée et courbe de l'étape parcourue
+    // Step to state i; duration and easing of the segment travelled
     const seg = dir > 0 ? tweens[i] : tweens[i + 1]
     return { state: states[i], duration: seg.duration ?? 0, ease: makeEase(seg) }
   }
@@ -252,7 +252,7 @@ export function playTransition(a, target, phase, ctx, toArray) {
     if (target._xrSequence !== token || repeatsLeft === 0) return
     if (repeatsLeft > 0) repeatsLeft--
     if (pingpong) return run(-d, 0)
-    // Répétition simple : retour instantané au point de départ, puis on rejoue
+    // Plain repeat: jump back to the start, then play again
     target.changeSelectedState(d > 0 ? states[0] : last, ctx, true)
     return run(d, 0)
   }
@@ -260,10 +260,10 @@ export function playTransition(a, target, phase, ctx, toArray) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// EXPRESSIONS (conditions et variables)
-// Une expression Spline est une liste de jetons : { id } pour une variable ou
-// une propriété d'objet, { name } pour un nombre, un opérateur, and / or,
-// True / False, ou un texte. Évaluée sans eval().
+// EXPRESSIONS (conditions and variables)
+// A Spline expression is a list of tokens: { id } for a variable or an object
+// property, { name } for a number, an operator, and / or, True / False, or a
+// text. Evaluated without eval().
 // ══════════════════════════════════════════════════════════════════════════════
 const BINARY = {
   '||': 1, '&&': 2,
@@ -286,7 +286,7 @@ function lexSplineTokens(tokens, shared) {
   for (const tok of tokens ?? []) {
     const t = tok?.data ?? tok
     if (!t) continue
-    if ('objType' in t) { out.push({ v: 0 }); continue }            // API, webhook, IA : non pris en charge
+    if ('objType' in t) { out.push({ v: 0 }); continue }            // API, webhook, AI: not supported
     if ('id' in t) {
       let v
       try { v = variableValue(shared.getVariable(t.id)) } catch { v = 0 }
@@ -310,13 +310,13 @@ function parse(toks) {
   const peek = () => toks[i]
   const unary = () => {
     const t = toks[i++]
-    if (!t) throw new Error('expression incomplète')
+    if (!t) throw new Error('incomplete expression')
     if (t.op === '!') return !unary()
     if (t.op === '-') return -unary()
     if (t.op === '+') return +unary()
     if (t.op === '(') { const v = expr(0); if (toks[i]?.op === ')') i++; return v }
     if ('v' in t) return t.v
-    throw new Error('jeton inattendu ' + t.op)
+    throw new Error('unexpected token ' + t.op)
   }
   const expr = minPrec => {
     let left = unary()
@@ -357,7 +357,7 @@ export function evaluateExpression(tokens, shared) {
   return parse(toks)
 }
 
-// Valeur au format attendu par shared.updateVariable selon le type actuel
+// Value in the shape expected by shared.updateVariable for the current type
 export function coerceForVariable(current, value) {
   if (typeof current === 'number') { const n = Number(value); return Number.isFinite(n) ? n : 0 }
   if (typeof current === 'boolean') return Boolean(value)
@@ -367,8 +367,8 @@ export function coerceForVariable(current, value) {
 
 // ══════════════════════════════════════════════════════════════════════════════
 // TIMELINES
-// Une timeline (sur la page de la scène) : durée en secondes, et pour chaque
-// objet des images clés { path: [propriété, axe], time, value, easing }.
+// A timeline (on the scene page): duration in seconds and, for each object,
+// keyframes { path: [property, axis], time, value, easing }.
 // ══════════════════════════════════════════════════════════════════════════════
 const timelines = new Map()   // id → lecteur
 const DEG2RAD = Math.PI / 180
@@ -392,7 +392,7 @@ const easeOfKeyframe = e => ({
   ...(e?.springParameters ?? {}),
 })
 
-// Pistes prises en charge : position / rotation / échelle (x, y, z) et opacité
+// Supported tracks: position / rotation / scale (x, y, z) and opacity
 function buildTracks(timeline, entityByUuid, toArray, unsupported) {
   const tracks = []
   for (const [uuid, ot] of Object.entries(timeline.objectTimelines ?? {})) {
@@ -421,8 +421,8 @@ function buildTracks(timeline, entityByUuid, toArray, unsupported) {
   return tracks
 }
 
-// Valeur d'une piste au temps t (s) : courbe de l'image clé de départ, avec le
-// second point de contrôle de l'image clé d'arrivée, comme le runtime
+// Track value at time t (s): easing of the start keyframe, with the second
+// control point of the end keyframe, like the runtime
 function sample(kfs, t) {
   if (!kfs.length) return undefined
   if (t <= kfs[0].time) return kfs[0].value
@@ -453,8 +453,8 @@ function applyTrack(tr, t) {
   if (!o.matrixAutoUpdate) o.updateMatrix()
 }
 
-// Calendrier repris du runtime : délai (début une fois, début, fin, les deux),
-// répétitions (-1 : infini), sens normal ou aller-retour
+// Schedule taken from the runtime: delay (start once, start, end, both),
+// repeats (-1: forever), normal or ping-pong direction
 function schedule({ duration, delay, delayDirection, direction, repeat }) {
   const pingpong = /pingpong/.test(direction ?? '')
   const layout = c => {
@@ -492,10 +492,10 @@ function schedule({ duration, delay, delayDirection, direction, repeat }) {
 }
 
 /**
- * Action Timeline de Spline : interaction play / pause / stop.
+ * Spline Timeline action: play / pause / stop interaction.
  * env : { root, entityByUuid, toArray, log, warn }
  */
-const timelineData = new Map()   // id → { tracks, duration } (pistes construites une fois)
+const timelineData = new Map()   // id → { tracks, duration } (tracks built once)
 
 export function playTimeline(a, env) {
   const id = a.timeline
@@ -508,7 +508,7 @@ export function playTimeline(a, env) {
     return
   }
 
-  // En cours de lecture : on laisse jouer ; en pause : reprise
+  // Playing: keep playing; paused: resume
   if (player && !player.finished) {
     if (player.paused) { player.paused = false; player.last = null; active.add(player) }
     return
@@ -518,19 +518,19 @@ export function playTimeline(a, env) {
   if (!data) {
     const timeline = findTimeline(env.root, id)
     if (!timeline) {
-      env.warn('Timeline introuvable :', id, '| timelines de la scène :', listTimelineIds(env.root))
+      env.warn('Timeline not found:', id, '| timelines in the scene:', listTimelineIds(env.root))
       return
     }
     const unsupported = new Set()
     const tracks = buildTracks(timeline, env.entityByUuid, env.toArray, unsupported)
-    if (unsupported.size) env.log('Timeline', id, ': pistes non prises en charge', [...unsupported])
+    if (unsupported.size) env.log('Timeline', id, ': unsupported tracks', [...unsupported])
     const duration = Number(timeline.duration) || Math.max(0, ...tracks.flatMap(t => t.kfs.map(k => k.time)))
     data = { tracks, duration }
     timelineData.set(id, data)
-    env.log('Timeline', id, '→', tracks.length, 'pistes,', duration, 's')
+    env.log('Timeline', id, '→', tracks.length, 'tracks,', duration, 's')
   }
 
-  // Nouvelle lecture avec les réglages de CETTE action
+  // New playback with the settings of THIS action
   const { tracks, duration } = data
   const repeat = a.repeat ?? 0
   const pingpong = /pingpong/.test(a.direction ?? '')
@@ -541,7 +541,7 @@ export function playTimeline(a, env) {
     direction: a.direction ?? 'normal',
     repeat,
   })
-  // Fin : dernière image du dernier cycle (au début si le dernier cycle est un retour)
+  // End: last frame of the last cycle (the start if the last cycle runs backwards)
   const endT = pingpong && repeat % 2 === 1 ? 0 : duration
   player = {
     elapsed: 0, paused: false, finished: false, last: null,

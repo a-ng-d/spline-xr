@@ -8,22 +8,23 @@ import {
 } from 'three'
 import { readScenePath, scenePath, saveWork, sceneUrlFromId, fileUrlFromId } from './works.js'
 import { initHome } from './home.js'
+import { initI18n, t, setText, translateDom, mountLanguageSwitch } from './i18n.js'
 import {
   playTransition, playTimeline, evaluateExpression, coerceForVariable,
   updateAnimations, stopAllAnimations,
 } from './animate.js'
 
-// ── Paramètres d'URL ───────────────────────────────────────────────────────────
+// ── URL parameters ─────────────────────────────────────────────────────────────
 //   ?debug        HUD + logs
-//   ?scale=0.002  échelle de la scène (mètres par unité Spline, défaut 0.001)
-//   ?mode=spline  forcer l'aperçu runtime Spline ; ?mode=vr forcer le moteur maison
+//   ?scale=0.002  scene scale (metres per Spline unit, default 0.001)
+//   ?mode=spline  force the Spline runtime preview; ?mode=vr force the home-made engine
 const PARAMS = new URLSearchParams(location.search)
 const DEBUG = PARAMS.has('debug')
-// Les scènes Spline sont exprimées en « pixels » : à 1 unité = 1 mm, une carte
-// de 300 unités mesure 30 cm et la caméra Spline (≈ 800 unités) se retrouve à
-// portée de bras. C'est ce qui rend le poke et la saisie possibles.
+// Spline scenes are expressed in "pixels": at 1 unit = 1 mm, a 300-unit card
+// is 30 cm wide and the Spline camera (≈ 800 units away) ends up within arm's
+// reach. This is what makes poking and grabbing possible.
 const WORLD_SCALE = parseFloat(PARAMS.get('scale')) || 0.001
-const EYE_HEIGHT = 1.6        // hauteur des yeux supposée en local-floor (m)
+const EYE_HEIGHT = 1.6        // assumed eye height in local-floor (m)
 const MIN_SCALE = WORLD_SCALE / 20, MAX_SCALE = WORLD_SCALE * 20
 const log  = (...a) => { if (DEBUG) console.log('[SplineXR]', ...a) }
 const warn = (...a) => console.warn('[SplineXR]', ...a)
@@ -42,13 +43,24 @@ const btnReset  = document.getElementById('btn-reset')
 const xrCanvas  = document.getElementById('xr-canvas')
 const bgCanvas  = document.getElementById('bg-canvas')
 
+// Translations (EN / FR) are loaded before anything is rendered
+await initI18n()
+mountLanguageSwitch(document.getElementById('lang-slot'))
+mountLanguageSwitch(hudEl)
+// title attribute from a translation key (re-translated on language switch)
+function setTitleKey(el, key) {
+  if (!key) { delete el.dataset.i18nTitle; el.title = ''; return }
+  el.dataset.i18nTitle = key
+  el.title = t(key)
+}
+
 // ── Debug HUD ──────────────────────────────────────────────────────────────────
 const debugEl = document.createElement('div')
 debugEl.style.cssText = 'position:fixed;top:8px;left:8px;z-index:30;color:#0f0;font:11px monospace;background:rgba(0,0,0,.85);padding:8px 12px;border-radius:6px;pointer-events:none;display:none;max-width:400px;white-space:pre-wrap;line-height:1.4;'
 document.body.appendChild(debugEl)
 function debugLog(msg) { if (!DEBUG) return; debugEl.style.display = 'block'; debugEl.textContent = msg }
 
-// ── Fond animé ─────────────────────────────────────────────────────────────────
+// ── Animated background ────────────────────────────────────────────────────────
 {
   const ctx = bgCanvas.getContext('2d')
   let t = 0
@@ -79,9 +91,9 @@ function showErr(msg) {
 const proxyUrl = url => url.replace('https://prod.spline.design/', '/spline-proxy/')
 
 // ── Liens partageables ─────────────────────────────────────────────────────────
-// Une scène = son lien /s/<id>?t=<titre>&f=<fichier Spline> : pas de base de
-// données, l'URL est l'enregistrement (voir works.js).
-const KEEP_PARAMS = ['debug', 'scale', 'mode']   // conservés d'une page à l'autre
+// A scene = its link /s/<id>?t=<title>&f=<Spline file>: no database, the URL
+// is the record (see works.js).
+const KEEP_PARAMS = ['debug', 'scale', 'mode']   // kept from one page to the next
 function routeUrl(path) {
   const qs = KEEP_PARAMS.filter(k => PARAMS.has(k))
     .map(k => PARAMS.get(k) ? `${k}=${encodeURIComponent(PARAMS.get(k))}` : k).join('&')
@@ -91,9 +103,9 @@ const shareUrl = scene => location.origin + scenePath(scene)
 const sceneFromLocation = () => readScenePath(location.href)
 let currentScene = null   // { id, t, f }
 
-// ── Choix du moteur ─────────────────────────────────────────────────────────────
-// Pas de casque : runtime officiel Spline (rendu et interactions exacts, à la
-// souris). Casque détecté : moteur maison (loader + WebXR).
+// ── Engine selection ────────────────────────────────────────────────────────────
+// No headset: official Spline runtime (exact rendering and interactions, with
+// the mouse). Headset detected: home-made engine (loader + WebXR).
 let xrSupport = null
 async function hasHeadset() {
   const forced = PARAMS.get('mode')
@@ -104,10 +116,10 @@ async function hasHeadset() {
   }
   return xrSupport
 }
-let preview = null        // aperçu runtime Spline en cours
+let preview = null        // current Spline runtime preview
 const sceneOpen = () => !!(threeScene || preview)
 
-// Accueil : formulaire, « Pour commencer », « Mes créations »
+// Home: form, "Get started", "My creations"
 const home = initHome({ onPlay: (scene, opts) => loadScene(scene, opts) })
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -124,21 +136,21 @@ cameraRig.add(camera)
 const clock = new Clock()
 let threeScene = null
 
-// Conteneur de la scène Spline : c'est lui qu'on met à l'échelle, déplace et
-// redimensionne. Le rig (le joueur) reste en mètres.
+// Container of the Spline scene: this is what gets scaled, moved and resized.
+// The rig (the player) stays in metres.
 const world = new Group()
 
-// Point de vue initial issu de la caméra Spline : position des yeux (monde),
-// lacet du rig, et inclinaison résiduelle utilisée hors VR uniquement.
+// Initial viewpoint taken from the Spline camera: eye position (world), rig
+// yaw, and the remaining tilt, used outside VR only.
 const UP = new Vector3(0, 1, 0)
 const view = {
-  eye: new Vector3(0, EYE_HEIGHT, 1),   // monde, scène à sa position par défaut
-  eyeLocal: new Vector3(),              // même point dans le repère de la scène
+  eye: new Vector3(0, EYE_HEIGHT, 1),   // world, scene at its default position
+  eyeLocal: new Vector3(),              // same point in the scene frame
   yaw: 0, tilt: new Quaternion(),
 }
 
-// Place le rig pour que les yeux tombent sur view.eye. En VR, le casque ajoute
-// déjà la hauteur de tête (local-floor) : on l'enlève du rig.
+// Places the rig so that the eyes land on view.eye. In VR, the headset already
+// adds the head height (local-floor): it is removed from the rig.
 function placeRig() {
   cameraRig.position.copy(view.eye)
   if (renderer.xr.isPresenting) cameraRig.position.y -= EYE_HEIGHT
@@ -164,12 +176,12 @@ window.addEventListener('resize', resize)
 
 // ══════════════════════════════════════════════════════════════════════════════
 // VISUELS DE POINTAGE
-// La scène pouvant être agrandie ou réduite, rayon, curseur et marqueur de
-// téléport sont mis à l'échelle de la distance pour garder une taille
+// As the scene can be scaled up or down, the ray, cursor and teleport marker
+// are scaled with distance to keep a constant apparent size.
 // apparente fixe.
 // ══════════════════════════════════════════════════════════════════════════════
-const RAY_IDLE_LENGTH = 4     // longueur du rayon sans cible (m)
-const CURSOR_ANGULAR  = 0.012 // taille du curseur ≈ 0,7° de champ de vision
+const RAY_IDLE_LENGTH = 4     // ray length without a target (m)
+const CURSOR_ANGULAR  = 0.012 // cursor size ≈ 0.7° of field of view
 
 function makeRayLine(color) {
   const geo = new BufferGeometry()
@@ -205,7 +217,7 @@ const teleportMarker = makeTeleportMarker()
 const loco = {
   speed: 1.5, snapAngle: Math.PI / 4, snapCooldown: 0, snapDelay: 0.35,
   deadzone: 0.25, teleportPending: false, teleportTarget: new Vector3(),
-  sceneSize: 0,          // plus grande dimension de la scène, en unités Spline
+  sceneSize: 0,          // largest dimension of the scene, in Spline units
   outOfBoundsShown: false, outOfBoundsTimer: 0,
 }
 
@@ -235,7 +247,7 @@ function createControllerModel(side) {
   return { group: g, stick, triggerLight }
 }
 
-// ── Modèle de main (articulations) ────────────────────────────────────────────
+// ── Hand model (joints) ───────────────────────────────────────────────────────
 const HAND_JOINTS = [
   'wrist',
   'thumb-metacarpal','thumb-phalanx-proximal','thumb-phalanx-distal','thumb-tip',
@@ -257,8 +269,8 @@ function createHandModel(side) {
   })
   return { group, meshes, matTip }
 }
-// Les articulations sont des enfants de l'objet main (même repère que le rig) :
-// on recopie simplement leur position locale.
+// Joints are children of the hand object (same frame as the rig): their local
+// position is simply copied.
 function updateHandModel(model, hand, selecting) {
   for (const name of HAND_JOINTS) {
     const j = hand.joints[name], m = model.meshes[name]
@@ -270,11 +282,11 @@ function updateHandModel(model, hand, selecting) {
 
 // ══════════════════════════════════════════════════════════════════════════════
 // POINTEURS XR
-// Un pointeur par source d'entrée (manette OU main). Le rayon utilisé est le
-// targetRaySpace fourni par le système : sur Quest, c'est le rayon officiel
-// de Meta pour les mains (épaule → pincement), stable et précis. Le clic passe
-// par les événements WebXR natifs selectstart/selectend, déclenchés aussi bien
-// par la gâchette que par le pincement pouce-index.
+// One pointer per input source (controller OR hand). The ray is the
+// targetRaySpace provided by the system: on Quest, this is Meta's official
+// hand ray (shoulder → pinch), stable and precise. Clicks go through the native
+// WebXR selectstart/selectend events, fired by the trigger as well as by the
+// thumb-index pinch.
 // ══════════════════════════════════════════════════════════════════════════════
 const raycaster = new Raycaster()
 const _mat = new Matrix4(), _origin = new Vector3(), _dir = new Vector3()
@@ -294,14 +306,14 @@ const pointers = [0, 1].map(i => {
     i, ctrl, grip, hand, model, handModel, ray, cursor,
     source: null, hit: null, entity: null,
     hoverEntity: null, pressEntity: null, selecting: false,
-    poking: null,                          // entité touchée du doigt
-    grabbing: false, grabPrev: null,       // saisie de la scène
-    squeezing: false, selectGrab: false,   // origine de la saisie (grip / pincement)
+    poking: null,                          // entity touched with the finger
+    grabbing: false, grabPrev: null,       // scene grab
+    squeezing: false, selectGrab: false,   // what started the grab (grip / pinch)
   }
   ctrl.addEventListener('connected', e => {
     p.source = e.data
     model.group.visible = !e.data.hand
-    log('Source connectée', i, e.data.handedness, e.data.hand ? 'main' : 'manette', e.data.targetRayMode)
+    log('Source connected', i, e.data.handedness, e.data.hand ? 'hand' : 'controller', e.data.targetRayMode)
   })
   ctrl.addEventListener('disconnected', () => {
     endPoke(p)
@@ -313,21 +325,21 @@ const pointers = [0, 1].map(i => {
   })
   ctrl.addEventListener('selectstart', () => onSelectStart(p))
   ctrl.addEventListener('selectend',   () => onSelectEnd(p))
-  // Bouton grip des manettes : saisie de la scène, quelle que soit la cible
+  // Controller grip button: grabs the scene, whatever the target
   ctrl.addEventListener('squeezestart', () => { p.squeezing = true; setGrab(p, true) })
   ctrl.addEventListener('squeezeend',   () => { p.squeezing = false; if (!p.selectGrab) setGrab(p, false) })
   return p
 })
 
 // ══════════════════════════════════════════════════════════════════════════════
-// EVENT SYSTEM — exécution des événements Spline
-// Le loader stocke les events dans entity.data.events (collection Map-like :
-// .forEach() mais ni .length ni Symbol.iterator). Idem pour actions et tweens.
+// EVENT SYSTEM — running Spline events
+// The loader stores events in entity.data.events (Map-like collection:
+// .forEach() but neither .length nor Symbol.iterator). Same for actions and tweens.
 // ══════════════════════════════════════════════════════════════════════════════
-let splineContext = null          // { scene, shared } : contexte attendu par le loader
-let meshToEntity = new Map()      // uuid du mesh → entité Spline portant les events
+let splineContext = null          // { scene, shared }: context expected by the loader
+let meshToEntity = new Map()      // mesh uuid → Spline entity carrying the events
 let interactiveObjects = []
-const hoverCount = new Map()      // entité → nombre de pointeurs qui la survolent
+const hoverCount = new Map()      // entity → number of pointers hovering it
 
 function toArray(thing) {
   if (!thing) return []
@@ -356,12 +368,12 @@ function collectObjects(splineScene) {
   splineContext.entityByUuid = entityByUuid
 
   const withEvents = [...new Set(meshToEntity.values())]
-  log('Meshes:', interactiveObjects.length, '| Entités interactives:', withEvents.length)
+  log('Meshes:', interactiveObjects.length, '| Interactive entities:', withEvents.length)
   withEvents.forEach(e => log('  →', e.name, getEventsArray(e).map(ev => (ev?.data ?? ev)?.type)))
 }
 
-// Entité interactive touchée (null si le premier objet touché n'a pas d'event :
-// l'occlusion est ainsi respectée)
+// Interactive entity hit (null if the first object hit has no event: occlusion
+// is respected)
 function entityOf(hit) { return hit ? (meshToEntity.get(hit.object.uuid) ?? null) : null }
 
 function fireRay(source) {
@@ -374,12 +386,12 @@ function fireRay(source) {
 }
 
 // ── Audio ────────────────────────────────────────────────────────────────────
-// Le loader embarque Howler : shared.getAudio(id) renvoie un lecteur
+// The loader ships Howler: shared.getAudio(id) returns a player
 // (play / pause / stop, volume, loop, delay).
 function getSound(id) {
   const shared = splineContext?.shared
   if (!id || !shared?.getAudio || !shared.audios?.[id]) return null
-  try { return shared.getAudio(id) } catch (e) { warn('Audio introuvable:', id, e.message); return null }
+  try { return shared.getAudio(id) } catch (e) { warn('Audio not found:', id, e.message); return null }
 }
 
 function runAudioAction(a) {
@@ -394,10 +406,10 @@ function runAudioAction(a) {
   } else if (a.interaction === 'pause' || a.interaction === 'stop') {
     const ids = [a.audio, a.playAudio].filter(Boolean)
     const targets = ids.map(getSound).filter(Boolean)
-    // Sans cible explicite, on arrête tous les sons de la scène
+    // Without an explicit target, every sound of the scene is stopped
     const list = targets.length ? targets : Object.keys(splineContext?.shared?.audios ?? {}).map(getSound).filter(Boolean)
     list.forEach(s => a.interaction === 'pause' ? s.pause() : s.stop())
-    log('Audio', a.interaction, ids.join(',') || 'tous')
+    log('Audio', a.interaction, ids.join(',') || 'all')
   }
 }
 
@@ -407,9 +419,9 @@ function stopAllAudio() {
   Object.values(audios).forEach(s => { try { s?.stop?.() } catch {} })
 }
 
-// ── Exécution des actions ────────────────────────────────────────────────────
-// phase : 'in' (entrée de survol), 'out' (sortie de survol) ou undefined (clic)
-// Actions qui gèrent elles-mêmes leur délai
+// ── Running actions ──────────────────────────────────────────────────────────
+// phase: 'in' (hover start), 'out' (hover end) or undefined (click)
+// Actions that handle their own delay
 const SELF_DELAYED = new Set(['Audio', 'Transition', 'TimelineAnimation'])
 
 function runActions(actions, phase) {
@@ -426,19 +438,19 @@ function runActions(actions, phase) {
 function runAction(a, phase) {
   if (a.type === 'Transition') {
     const target = splineContext.entityByUuid?.get(a.object)
-    if (!target) { warn('Cible de transition introuvable:', a.object); return }
-    log('Transition →', target.name, '| phase:', phase ?? 'clic')
-    // Animée : durée, délai, courbe, répétition (animate.js)
+    if (!target) { warn('Transition target not found:', a.object); return }
+    log('Transition →', target.name, '| phase:', phase ?? 'click')
+    // Animated: duration, delay, easing, repeat (animate.js)
     playTransition(a, target, phase, splineContext, toArray)
 
   } else if (a.type === 'Audio') {
-    // Une sortie de survol ne relance pas un son déclenché à l'entrée
+    // Ending a hover does not restart a sound started on hover start
     if (phase !== 'out') runAudioAction(a)
 
   } else if (a.type === 'Conditional') {
-    // Comme le runtime : expression vide ou illisible → aucune branche
+    // Like the runtime: empty or unreadable expression → no branch
     let ok
-    try { ok = evaluateExpression(a.condition, splineContext.shared) } catch (e) { warn('Condition illisible:', e.message) }
+    try { ok = evaluateExpression(a.condition, splineContext.shared) } catch (e) { warn('Unreadable condition:', e.message) }
     if (ok === undefined) return
     log('Condition →', !!ok)
     runActions(ok ? a.ifActions : a.elseActions, phase)
@@ -457,7 +469,7 @@ function runAction(a, phase) {
     const url = a.url || a.value || a.link
     if (url && phase !== 'out') window.open(url, '_blank', 'noopener')
   } else {
-    log('Action non gérée:', a.type, a)
+    log('Unsupported action:', a.type, a)
   }
 }
 
@@ -467,13 +479,13 @@ function setVariable(id, expression) {
   const shared = splineContext?.shared
   if (!id || !shared?.updateVariable) return
   let value
-  try { value = evaluateExpression(expression, shared) } catch (e) { warn('Expression illisible:', e.message); return }
+  try { value = evaluateExpression(expression, shared) } catch (e) { warn('Unreadable expression:', e.message); return }
   if (value === undefined) return
   let current
   try { current = shared.getVariable(id) } catch { current = undefined }
   try { shared.updateVariable(id, coerceForVariable(current, value)) } catch (e) { warn('Variable', id, ':', e.message); return }
   log('Variable', id, '=', value)
-  // Événements « Changement de variable » (garde-fou contre les boucles)
+  // "Variable Change" events (guard against loops)
   if (variableDepth > 8) return
   variableDepth++
   try {
@@ -493,12 +505,12 @@ function triggerEvent(entity, eventType, phase) {
     if (!e) continue
     if ((e.type ?? evt.type) !== eventType) continue
     if (e.disabled || evt.disabled) continue
-    log('▶', eventType, phase ?? '', 'sur', entity.name)
+    log('▶', eventType, phase ?? '', 'on', entity.name)
     runActions(e.actions ?? evt.actions, phase)
   }
 }
 
-// ── Survol : compteur par entité pour que deux pointeurs ne se contredisent pas
+// ── Hover: counted per entity so that two pointers do not contradict each other
 function setHover(p, entity) {
   if (p.hoverEntity === entity) return
   const prev = p.hoverEntity
@@ -515,18 +527,18 @@ function setHover(p, entity) {
   p.hoverEntity = entity
 }
 
-// ── Clic : gâchette ou pincement ─────────────────────────────────────────────
+// ── Click: trigger or pinch ──────────────────────────────────────────────────
 function onSelectStart(p) {
   if (!threeScene) return
   p.selecting = true
-  // Le rayon a pu ne pas encore être évalué ce frame-ci (pointeur transitoire)
+  // The ray may not have been evaluated yet this frame (transient pointer)
   if (!p.hit) { p.hit = fireRay(p.ctrl); p.entity = entityOf(p.hit) }
-  if (p.poking) return            // le doigt est déjà en contact : le poke gère
+  if (p.poking) return            // the finger is already touching: the poke handles it
   if (p.entity) {
     p.pressEntity = p.entity
     triggerEvent(p.entity, 'MouseDown')
   } else {
-    // Pincement / gâchette dans le vide : on saisit la scène
+    // Pinch / trigger in empty space: grab the scene
     p.selectGrab = true
     setGrab(p, true)
   }
@@ -542,10 +554,10 @@ function onSelectEnd(p) {
   if (p.entity === pressed) triggerEvent(pressed, 'MousePress')
 }
 
-// ── Poke : contact du bout de l'index ────────────────────────────────────────
-// On lance un rayon court de la dernière phalange vers le bout du doigt,
-// prolongé de quelques millimètres. Le relâchement demande un retrait plus
-// grand (hystérésis) pour éviter les doubles déclenchements.
+// ── Poke: index fingertip contact ────────────────────────────────────────────
+// A short ray is cast from the last phalanx towards the fingertip, extended
+// by a few millimetres. Releasing needs a larger withdrawal (hysteresis) to
+// avoid double triggers.
 const POKE_DEPTH = 0.008, POKE_RELEASE = 0.02
 const _tip = new Vector3(), _dst = new Vector3(), _pokeDir = new Vector3()
 
@@ -586,16 +598,16 @@ function endPoke(p) {
   log('Poke ↑', e.name)
 }
 
-// ── Saisie de la scène ───────────────────────────────────────────────────────
-// Une main : la scène suit la main. Deux mains : écarter / rapprocher les
-// mains agrandit / réduit la scène autour de leur point milieu.
+// ── Scene grab ───────────────────────────────────────────────────────────────
+// One hand: the scene follows the hand. Two hands: moving the hands apart /
+// together scales the scene up / down around their midpoint.
 const grab = { count: 0, prevDist: 0 }
 const _ga = new Vector3(), _gb = new Vector3(), _gmid = new Vector3(), _gd = new Vector3()
 
 function setGrab(p, on) {
   p.grabbing = on
   p.grabPrev = null
-  grab.count = -1                // force la réinitialisation au prochain frame
+  grab.count = -1                // forces a reset on the next frame
 }
 
 function updateWorldGrab() {
@@ -606,8 +618,7 @@ function updateWorldGrab() {
     grab.count = grabbers.length
   }
   if (grabbers.length === 1) {
-    // Position de la main dans le repère du rig : pas de boucle de rétroaction
-    // quand on déplace le rig.
+    // Hand position in the rig frame: no feedback loop when the rig moves.
     const p = grabbers[0]
     const cur = p.ctrl.position
     if (p.grabPrev) {
@@ -633,7 +644,7 @@ function updateWorldGrab() {
 }
 const MathClamp = (v, a, b) => Math.min(b, Math.max(a, v))
 
-// ── Mise à jour visuelle d'un pointeur ───────────────────────────────────────
+// ── Pointer visuals ──────────────────────────────────────────────────────────
 function updatePointerVisuals(p) {
   const { ray, cursor, hit } = p
   const active = !!p.source && p.source.targetRayMode !== 'screen'
@@ -643,7 +654,7 @@ function updatePointerVisuals(p) {
   ray.scale.z = hit ? hit.distance : RAY_IDLE_LENGTH
   ray.material.opacity = p.entity ? 0.85 : 0.4
   if (hit) {
-    // Curseur au point d'impact, tourné vers la caméra, taille apparente constante
+    // Cursor at the hit point, facing the camera, constant apparent size
     cursor.group.position.copy(hit.point)
     renderer.xr.getCamera().getWorldPosition(_camPos)
     cursor.group.lookAt(_camPos)
@@ -653,7 +664,7 @@ function updatePointerVisuals(p) {
   }
 }
 
-// ── Boucle contrôles ──────────────────────────────────────────────────────────
+// ── Controls loop ─────────────────────────────────────────────────────────────
 let debugCounter = 0
 function updateControls(dt) {
   if (!renderer.xr.isPresenting) return
@@ -662,8 +673,8 @@ function updateControls(dt) {
   _right.set(_fwd.z, 0, -_fwd.x)
   loco.snapCooldown = Math.max(0, loco.snapCooldown - dt)
 
-  // Out-of-bounds : distance au point de vue initial, suivi dans le repère de
-  // la scène (qui peut avoir été déplacée ou redimensionnée)
+  // Out-of-bounds: distance to the initial viewpoint, tracked in the scene frame
+  // (the scene may have been moved or resized)
   if (loco.sceneSize > 0) {
     world.localToWorld(_oobTarget.copy(view.eyeLocal))
     _oobRig.copy(cameraRig.position); _oobRig.y += EYE_HEIGHT
@@ -681,10 +692,10 @@ function updateControls(dt) {
     const src = p.source
     if (!src) continue
 
-    // 1. Main : le contact du doigt passe avant le rayon
+    // 1. Hand: finger contact comes before the ray
     if (src.hand) updatePoke(p)
 
-    // 2. Rayon système → cible (masqué pendant un contact)
+    // 2. System ray → target (hidden while touching)
     if (p.poking) {
       p.hit = null
       p.entity = p.poking
@@ -698,7 +709,7 @@ function updateControls(dt) {
       updatePointerVisuals(p)
     }
 
-    // 3. Main : affichage des articulations
+    // 3. Hand: draw the joints
     if (src.hand) {
       p.handModel.group.visible = true
       updateHandModel(p.handModel, p.hand, p.selecting)
@@ -706,7 +717,7 @@ function updateControls(dt) {
     }
     p.handModel.group.visible = false
 
-    // 4. Manette : joysticks (déplacement, rotation, téléport)
+    // 4. Controller: thumbsticks (move, turn, teleport)
     const gp = src.gamepad
     if (!gp) continue
     const jx = gp.axes[2] ?? gp.axes[0] ?? 0
@@ -726,7 +737,7 @@ function updateControls(dt) {
         else if (jx < -0.6) { cameraRig.rotateY( loco.snapAngle); loco.snapCooldown = loco.snapDelay }
       }
       if (jy < -0.6) {
-        // Joystick poussé vers l'avant : viser le point de téléport
+        // Thumbstick pushed forward: aim at the teleport point
         if (p.hit) {
           teleportMarker.visible = true
           teleportMarker.position.copy(p.hit.point)
@@ -740,24 +751,24 @@ function updateControls(dt) {
       }
     }
 
-    // Retour visuel de la manette
+    // Controller visual feedback
     const tv = gp.buttons[0]?.value ?? 0
     p.model.triggerLight.material.opacity = tv * 0.8
     p.model.stick.rotation.x = jy * 0.25
     p.model.stick.rotation.z = -jx * 0.25
   }
 
-  // 5. Saisie de la scène (une ou deux mains)
+  // 5. Scene grab (one or two hands)
   updateWorldGrab()
 
   if (DEBUG && (++debugCounter % 20 === 0)) {
     debugLog(pointers.map(p => {
       if (!p.source) return `[${p.i}] —`
-      const kind = p.source.hand ? 'main' : 'manette'
-      const target = p.poking ? 'contact' : p.hit ? (p.hit.object.name || 'mesh') : 'rien'
+      const kind = p.source.hand ? 'hand' : 'controller'
+      const target = p.poking ? 'contact' : p.hit ? (p.hit.object.name || 'mesh') : 'nothing'
       const flags = [p.selecting && 'PRESS', p.poking && 'POKE', p.grabbing && 'GRAB'].filter(Boolean).join(' ')
-      return `[${p.i}] ${p.source.handedness} ${kind} ${p.source.targetRayMode}\n    vise: ${target} | entité: ${p.entity?.name ?? '—'} ${flags}`
-    }).join('\n') + `\nmeshes: ${interactiveObjects.length} | survols: ${hoverCount.size} | échelle: ${(world.scale.x * 1000).toFixed(2)} mm/u`)
+      return `[${p.i}] ${p.source.handedness} ${kind} ${p.source.targetRayMode}\n    aim: ${target} | entity: ${p.entity?.name ?? '—'} ${flags}`
+    }).join('\n') + `\nmeshes: ${interactiveObjects.length} | hovers: ${hoverCount.size} | scale: ${(world.scale.x * 1000).toFixed(2)} mm/u`)
   }
 }
 const _oobTarget = new Vector3(), _oobRig = new Vector3()
@@ -781,7 +792,8 @@ function detachXR(scene) {
 // ── Out-of-bounds ────────────────────────────────────────────────────────────
 const oobOverlay = document.createElement('div')
 oobOverlay.style.cssText = 'position:fixed;inset:0;z-index:25;display:none;align-items:center;justify-content:center;background:rgba(6,6,15,.75);backdrop-filter:blur(8px);flex-direction:column;gap:14px;'
-oobOverlay.innerHTML = `<div style="font-size:28px">🧭</div><div style="font-size:16px;font-weight:600;color:#e8e8f0">Tu t'es éloigné</div><div style="font-size:13px;color:#7a7a95">Reset automatique dans 3s…</div><button id="oob-reset-btn" style="margin-top:4px;padding:10px 22px;border-radius:100px;border:1px solid rgba(123,110,246,.5);background:rgba(123,110,246,.2);color:#7b6ef6;font-size:13px;font-weight:600;cursor:pointer;">Revenir maintenant</button>`
+oobOverlay.innerHTML = `<div style="font-size:28px">🧭</div><div style="font-size:16px;font-weight:600;color:#e8e8f0" data-i18n="oob.title"></div><div style="font-size:13px;color:#7a7a95" data-i18n="oob.auto"></div><button id="oob-reset-btn" style="margin-top:4px;padding:10px 22px;border-radius:100px;border:1px solid rgba(123,110,246,.5);background:rgba(123,110,246,.2);color:#7b6ef6;font-size:13px;font-weight:600;cursor:pointer;" data-i18n="oob.back"></button>`
+translateDom(oobOverlay)
 document.body.appendChild(oobOverlay)
 document.getElementById('oob-reset-btn').onclick = () => resetCamera()
 function showOutOfBounds() { oobOverlay.style.display = 'flex' }
@@ -793,7 +805,7 @@ function resetCamera() {
   loco.outOfBoundsShown = false; loco.outOfBoundsTimer = 0; hideOutOfBounds()
 }
 
-// ── Caméra Spline ────────────────────────────────────────────────────────────
+// ── Spline camera ────────────────────────────────────────────────────────────
 function extractSplineCamera(splineScene) {
   splineScene.updateMatrixWorld(true)
   const candidates = []
@@ -815,12 +827,12 @@ function extractSplineCamera(splineScene) {
   const d = best.data ?? {}
   const fov = d.perspective?.fov ?? best.fov ?? 45
   const zoom = d.perspective?.zoom ?? best.zoom ?? 1
-  log('Caméra:', best.name, '| pos:', pos.toArray().map(v => Math.round(v)), '| fov:', fov)
+  log('Camera:', best.name, '| pos:', pos.toArray().map(v => Math.round(v)), '| fov:', fov)
   return { pos, quat, fov, zoom }
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// SCÈNE + CHARGEMENT
+// SCENE + LOADING
 // ══════════════════════════════════════════════════════════════════════════════
 function buildScene(splineScene) {
   const scene = new Scene()
@@ -833,7 +845,7 @@ function buildScene(splineScene) {
   scene.add(new AmbientLight(0xffffff, 0.6))
   const dl = new DirectionalLight(0xffffff, 0.8); dl.position.set(300, 600, 400); scene.add(dl)
 
-  // La scène Spline est placée dans le conteneur mis à l'échelle
+  // The Spline scene goes into the scaled container
   world.clear()
   resetWorld()
   world.add(splineScene)
@@ -841,17 +853,17 @@ function buildScene(splineScene) {
   collectLights(splineScene)
   applyLightScale()
 
-  // Contexte au format attendu par les entités du loader : { shared, scene }
+  // Context in the shape expected by loader entities: { shared, scene }
   const shared = splineScene.sharedAssets ?? splineScene._sharedAssets ?? null
-  if (!shared) warn('sharedAssets introuvable : transitions et audio limités')
+  if (!shared) warn('sharedAssets not found: transitions and audio limited')
   splineContext = { scene: splineScene, shared, entityByUuid: new Map() }
   collectObjects(splineScene)
-  // Variables liées à des propriétés d'objets : le loader a besoin d'un contexte
-  // { scene.find(uuid), shared } qu'il ne crée pas lui-même
+  // Variables bound to object properties: the loader needs a context
+  // { scene.find(uuid), shared } that it never creates itself
   if (typeof splineScene.find !== 'function') splineScene.find = id => splineContext.entityByUuid.get(id)
-  try { shared?.setEntityOpContext?.(splineContext) } catch (e) { warn('Contexte des variables:', e.message) }
+  try { shared?.setEntityOpContext?.(splineContext) } catch (e) { warn('Variable context:', e.message) }
 
-  // Événements Start (dont la musique d'ambiance)
+  // Start events (including background music)
   setTimeout(() => {
     if (!splineContext) return
     for (const [, entity] of splineContext.entityByUuid) {
@@ -859,8 +871,8 @@ function buildScene(splineScene) {
     }
   }, 200)
 
-  // Point de vue : position et orientation de la caméra Spline (unités Spline,
-  // la scène n'étant pas encore mise à l'échelle au moment de l'extraction)
+  // Viewpoint: position and orientation of the Spline camera (Spline units, the
+  // scene is not scaled yet when they are read)
   const quat = new Quaternion()
   if (splineCam) {
     view.eyeLocal.copy(splineCam.pos)
@@ -874,8 +886,8 @@ function buildScene(splineScene) {
   }
   camera.updateProjectionMatrix()
 
-  // En VR, seul le lacet est appliqué au rig (le sol doit rester horizontal) ;
-  // tangage et roulis ne servent qu'à la vue hors casque.
+  // In VR, only the yaw is applied to the rig (the floor must stay level);
+  // pitch and roll are only used for the non-VR view.
   const e = new Euler().setFromQuaternion(quat, 'YXZ')
   view.yaw = e.y
   view.tilt.setFromEuler(new Euler(e.x, 0, e.z, 'YXZ'))
@@ -885,14 +897,14 @@ function buildScene(splineScene) {
 
   const sz = new Box3().setFromObject(splineScene).getSize(new Vector3()).divideScalar(WORLD_SCALE)
   loco.sceneSize = Math.max(sz.x, sz.y, sz.z)
-  log('Échelle:', WORLD_SCALE, 'm/u | taille scène:', Math.round(loco.sceneSize), 'u ≈', (loco.sceneSize * WORLD_SCALE).toFixed(2), 'm')
+  log('Scale:', WORLD_SCALE, 'm/u | scene size:', Math.round(loco.sceneSize), 'u ≈', (loco.sceneSize * WORLD_SCALE).toFixed(2), 'm')
 
   attachXR(scene)
   return scene
 }
 
-// ── Lumières : les distances d'atténuation ne suivent pas l'échelle du parent,
-// on les recalcule pour garder l'éclairage authored dans Spline.
+// ── Lights: attenuation distances do not follow the parent's scale, so they
+// are recomputed to keep the lighting authored in Spline.
 let sceneLights = []
 function collectLights(root) {
   sceneLights = []
@@ -939,21 +951,21 @@ function loadSpline(url) {
   })
 }
 
-// scene : { id, t, f }. fromRoute : ouverte depuis l'adresse de la page (ne pas
-// réécrire l'historique). save : enregistrer dans Mes créations (editKey = création modifiée).
+// scene: { id, t, f }. fromRoute: opened from the page address (do not rewrite
+// history). save: store in My creations (editKey = the creation being edited).
 async function loadScene(scene, { fromRoute = false, save = false, editKey = null } = {}) {
-  scene = scene?.id ? readScenePath(scenePath(scene)) : null   // normalise titre et fichier
-  if (!scene) { showErr('Lien de scène invalide'); return }
+  scene = scene?.id ? readScenePath(scenePath(scene)) : null   // normalises title and file
+  if (!scene) { showErr(t('errors.invalidLink')); return }
   goBtn.disabled = true; errBar.classList.remove('visible')
   configEl.classList.add('out'); loadingEl.classList.add('visible')
-  loadMsg.textContent = 'Chargement Spline…'
+  setText(loadMsg, 'loading.spline')
   try {
     const headset = await hasHeadset()
     const src = proxyUrl(sceneUrlFromId(scene.id))
     let spline = null, nextPreview = null
     if (headset) spline = await loadSpline(src)
     else {
-      // Chargé à la demande : le casque n'a jamais besoin du runtime Spline
+      // Loaded on demand: the headset never needs the Spline runtime
       const { createSplinePreview } = await import('./spline-preview.js')
       nextPreview = await createSplinePreview(src, document.body)
     }
@@ -961,8 +973,11 @@ async function loadScene(scene, { fromRoute = false, save = false, editKey = nul
     if (save) { saveWork({ key: editKey, scene }); home.resetForm() }
     const url = routeUrl(scenePath(scene))
     if (!fromRoute && location.pathname + location.search !== url) history.pushState(null, '', url)
-    document.title = scene.t ? `${scene.t} — SplineXR` : 'SplineXR'
-    loadMsg.textContent = 'Construction de la scène…'
+    // Scene title in the tab (removed from automatic translation while the scene is open)
+    const titleEl = document.querySelector('title')
+    if (scene.t) { setText(titleEl, ''); document.title = `${scene.t} — SplineXR` }
+    else setText(titleEl, 'home.pageTitle')
+    setText(loadMsg, 'loading.build')
     teardownEngines()
     if (headset) {
       threeScene = buildScene(spline)
@@ -978,10 +993,10 @@ async function loadScene(scene, { fromRoute = false, save = false, editKey = nul
       checkXR()
     } else {
       preview = nextPreview
-      btnReset.hidden = true   // la caméra est celle de la scène Spline
+      btnReset.hidden = true   // the camera is the Spline scene's
       btnVr.disabled = true
-      btnVr.textContent = '🖱 Aperçu Spline · pas de casque'
-      btnVr.title = 'Ouvre ce lien dans le navigateur du Meta Quest pour la VR'
+      setText(btnVr, 'hud.preview')
+      setTitleKey(btnVr, 'hud.previewTitle')
     }
     loadingEl.classList.remove('visible')
     hudEl.classList.add('visible')
@@ -992,12 +1007,11 @@ async function loadScene(scene, { fromRoute = false, save = false, editKey = nul
     loadingEl.classList.remove('visible'); configEl.classList.remove('out')
     goBtn.disabled = false
     if (fromRoute) { history.replaceState(null, '', routeUrl('/')); home.editScene(scene) }
-    showErr('Erreur : ' + (err.message || 'impossible de charger') +
-      (fromRoute ? ' — la scène est-elle bien exportée en URL publique dans Spline ?' : ''))
+    showErr(t(fromRoute ? 'errors.notPublic' : 'errors.load', { message: err.message || t('errors.loadDefault') }))
   }
 }
 
-// Arrête le moteur en cours, quel qu'il soit
+// Stops the current engine, whichever it is
 function teardownEngines() {
   renderer.setAnimationLoop(null)
   if (threeScene) { detachXR(threeScene); stopAllAudio(); stopAllAnimations(); threeScene = null }
@@ -1009,10 +1023,10 @@ function teardownEngines() {
 function closeScene() {
   teardownEngines()
   hudEl.classList.remove('visible')
-  btnVr.disabled = true; btnVr.textContent = '🥽 Entrer en VR'
+  btnVr.disabled = true; setText(btnVr, 'hud.enterVr'); setTitleKey(btnVr, '')
   configEl.classList.remove('out'); goBtn.disabled = false; threeScene = null
   currentScene = null
-  document.title = 'SplineXR'
+  setText(document.querySelector('title'), 'home.pageTitle')
   hideShareBar()
   debugEl.style.display = 'none'
 }
@@ -1025,14 +1039,14 @@ function goHome() {
 }
 btnBack.onclick = goHome
 
-// « Modifier » : retour à l'accueil avec la scène dans le formulaire ; ouverte
-// depuis un lien, elle rejoint ainsi Mes créations à l'enregistrement.
+// "Edit": back to the home page with the scene in the form; when it was opened
+// from a link, saving it adds it to My creations.
 const btnEdit = document.createElement('button')
-btnEdit.className = 'hud-btn'; btnEdit.id = 'btn-edit'; btnEdit.textContent = '✎ Modifier'
+btnEdit.className = 'hud-btn'; btnEdit.id = 'btn-edit'; setText(btnEdit, 'hud.edit')
 btnBack.after(btnEdit)
 btnEdit.onclick = () => { const s = currentScene; goHome(); if (s) home.editScene(s) }
 
-// Précédent / suivant du navigateur
+// Browser back / forward
 window.addEventListener('popstate', () => {
   const s = sceneFromLocation()
   if (s && s.id !== currentScene?.id) loadScene(s, { fromRoute: true })
@@ -1040,11 +1054,11 @@ window.addEventListener('popstate', () => {
   else if (!s && sceneOpen()) closeScene()
 })
 
-// ── Aperçu du lien (image Open Graph) ────────────────────────────────────────
-// À la première ouverture d'une scène sans aperçu, on photographie la vue
-// initiale (1200×630) et on l'envoie à /api/thumb/<id> (Netlify Blobs).
+// ── Link preview (Open Graph image) ──────────────────────────────────────────
+// The first time a scene without a preview is opened, the initial view is
+// captured (1200×630) and sent to /api/thumb/<id> (Netlify Blobs).
 const THUMB_W = 1200, THUMB_H = 630, THUMB_MAX = 480 * 1024
-let thumbRequest = null   // { id, resolve } : capture à faire au prochain rendu
+let thumbRequest = null   // { id, resolve }: capture to take on the next render
 
 async function thumbnailExists(id) {
   const r = await fetch(`/api/thumb/${id}?exists=1`, { cache: 'no-store' })
@@ -1052,13 +1066,13 @@ async function thumbnailExists(id) {
   return (await r.json()).exists
 }
 
-// Capture au prochain rendu ; résout avec true si l'envoi a réussi
+// Captures on the next render; resolves with true if the upload succeeded
 function requestThumbnail(id) {
   return new Promise(resolve => {
     if (renderer.xr.isPresenting || currentScene?.id !== id) return resolve(false)
-    // Runtime Spline : tampon conservé, capture immédiate
+    // Spline runtime: preserved buffer, immediate capture
     if (preview) return captureCanvas(id, preview.canvas, resolve)
-    // Moteur maison : au prochain rendu (tampon WebGL non conservé)
+    // Home-made engine: on the next render (WebGL buffer not preserved)
     thumbRequest = { id, resolve }
   })
 }
@@ -1066,12 +1080,12 @@ function requestThumbnail(id) {
 function scheduleThumbnail(id) {
   thumbnailExists(id).then(exists => {
     if (exists) return
-    // Laisse le temps aux textures de se charger
-    setTimeout(() => { if (currentScene?.id === id) requestThumbnail(id).then(ok => log('Aperçu créé:', ok)) }, 2500)
-  }).catch(e => log('Aperçu ignoré:', e.message))
+    // Gives textures time to load
+    setTimeout(() => { if (currentScene?.id === id) requestThumbnail(id).then(ok => log('Preview created:', ok)) }, 2500)
+  }).catch(e => log('Preview skipped:', e.message))
 }
 
-// Appelée dans la boucle, juste après renderer.render()
+// Called in the loop, right after renderer.render()
 function takeThumbnail() {
   const { id, resolve } = thumbRequest
   thumbRequest = null
@@ -1084,11 +1098,11 @@ function captureCanvas(id, src, resolve) {
   const c = document.createElement('canvas'); c.width = THUMB_W; c.height = THUMB_H
   const ctx = c.getContext('2d')
   ctx.fillStyle = '#06060f'; ctx.fillRect(0, 0, THUMB_W, THUMB_H)
-  // Recadrage « cover » centré
+  // Centred "cover" crop
   const k = Math.max(THUMB_W / src.width, THUMB_H / src.height)
   const w = src.width * k, h = src.height * k
   ctx.drawImage(src, (THUMB_W - w) / 2, (THUMB_H - h) / 2, w, h)
-  uploadThumbnail(id, c).then(resolve, e => { warn('Aperçu non envoyé:', e.message); resolve(false) })
+  uploadThumbnail(id, c).then(resolve, e => { warn('Preview not uploaded:', e.message); resolve(false) })
 }
 
 async function uploadThumbnail(id, canvas) {
@@ -1103,7 +1117,7 @@ async function uploadThumbnail(id, canvas) {
   return true
 }
 
-// ── Bandeau « Lien de la scène » ─────────────────────────────────────────────
+// ── "Scene link" bar ─────────────────────────────────────────────────────────
 const shareBar  = document.getElementById('share-bar')
 const shareLink = document.getElementById('share-url')
 const shareCopy = document.getElementById('share-copy')
@@ -1113,21 +1127,22 @@ shareThumb.onclick = async () => {
   shareThumb.disabled = true; shareThumb.textContent = '…'
   const ok = await requestThumbnail(currentScene.id)
   shareThumb.textContent = ok ? '✓' : '✕'
-  shareThumb.title = ok ? 'Aperçu mis à jour' : 'Échec : réessaie hors VR, une fois le site en ligne'
-  setTimeout(() => { shareThumb.textContent = '📷'; shareThumb.title = 'Utiliser la vue actuelle comme aperçu du lien'; shareThumb.disabled = false }, 2500)
+  setTitleKey(shareThumb, ok ? 'share.thumbDone' : 'share.thumbFailed')
+  setTimeout(() => { shareThumb.textContent = '📷'; setTitleKey(shareThumb, 'share.thumbTitle'); shareThumb.disabled = false }, 2500)
 }
 
 const shareLabel  = document.getElementById('share-label')
 const shareSource = document.getElementById('share-source')
 function showShareBar(scene) {
   const link = shareUrl(scene)
-  shareLabel.textContent = scene.t || 'Lien de la scène'
+  if (scene.t) { setText(shareLabel, ''); shareLabel.textContent = scene.t }
+  else setText(shareLabel, 'share.label')
   shareLabel.title = scene.t || ''
   shareSource.hidden = !scene.f
   if (scene.f) shareSource.href = fileUrlFromId(scene.f)
   shareLink.href = link
   shareLink.textContent = link.replace(/^https?:\/\//, '')
-  shareCopy.textContent = 'Copier'; shareCopy.classList.remove('done')
+  setText(shareCopy, 'share.copy'); shareCopy.classList.remove('done')
   shareBar.classList.add('visible')
 }
 function hideShareBar() { shareBar.classList.remove('visible') }
@@ -1138,31 +1153,32 @@ shareCopy.onclick = async () => {
   let ok = false
   try { await navigator.clipboard.writeText(link); ok = true } catch {}
   if (!ok) {
-    // Presse-papiers indisponible : on sélectionne le lien pour un copier manuel
+    // Clipboard unavailable: select the link for a manual copy
     const r = document.createRange(); r.selectNodeContents(shareLink)
     const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r)
   }
-  shareCopy.textContent = ok ? '✓ Copié' : 'Ctrl+C'
+  setText(shareCopy, ok ? 'share.copied' : 'share.copyManual')
   shareCopy.classList.toggle('done', ok)
-  setTimeout(() => { shareCopy.textContent = 'Copier'; shareCopy.classList.remove('done') }, 2000)
+  setTimeout(() => { setText(shareCopy, 'share.copy'); shareCopy.classList.remove('done') }, 2000)
 }
 
-// ── Ouverture directe d'un lien /s/<id> ──────────────────────────────────────
+// ── Opening a /s/<id> link directly ──────────────────────────────────────────
 {
   const s = sceneFromLocation()
   if (s) {
-    // ?scene=<URL ou id> est normalisé en /s/<id>
+    // ?scene=<URL or id> is normalised to /s/<id>
     if (!location.pathname.startsWith('/s/')) history.replaceState(null, '', routeUrl(scenePath(s)))
     loadScene(s, { fromRoute: true })
   }
 }
 
 async function checkXR() {
-  if (!navigator.xr) { btnVr.textContent = '🥽 WebXR non supporté'; return }
+  setTitleKey(btnVr, '')
+  if (!navigator.xr) { setText(btnVr, 'hud.noWebxr'); return }
   const ok = await navigator.xr.isSessionSupported('immersive-vr').catch(() => false)
   btnVr.disabled = false
-  if (ok) { btnVr.textContent = '🥽 Entrer en VR'; btnVr.onclick = enterVR }
-  else { btnVr.textContent = '🥽 Casque non détecté'; btnVr.title = 'Ouvre depuis le Meta Quest Browser'; btnVr.disabled = true }
+  if (ok) { setText(btnVr, 'hud.enterVr'); btnVr.onclick = enterVR }
+  else { setText(btnVr, 'hud.noHeadset'); setTitleKey(btnVr, 'hud.noHeadsetTitle'); btnVr.disabled = true }
 }
 
 async function enterVR() {
@@ -1172,8 +1188,8 @@ async function enterVR() {
       optionalFeatures: ['bounded-floor', 'hand-tracking']
     })
     await renderer.xr.setSession(session)
-    btnVr.textContent = '⏹ Quitter VR'
-    session.addEventListener('end', () => { btnVr.textContent = '🥽 Entrer en VR'; btnVr.onclick = enterVR })
+    setText(btnVr, 'hud.exitVr')
+    session.addEventListener('end', () => { setText(btnVr, 'hud.enterVr'); btnVr.onclick = enterVR })
     btnVr.onclick = () => session.end()
-  } catch (e) { showErr('Erreur VR : ' + (e.message || 'inconnue')) }
+  } catch (e) { showErr(t('errors.vr', { message: e.message || t('errors.unknown') })) }
 }

@@ -1,0 +1,89 @@
+{
+  "lang": {
+    "switch": "Langue"
+  },
+  "home": {
+    "pageTitle": "SplineXR",
+    "title": "Explore en <span>VR</span><br>tes scènes Spline",
+    "lead": "Colle l'URL d'export de ta scène Spline : tu obtiens un lien à partager, à ouvrir sur ordinateur ou dans un casque Meta Quest."
+  },
+  "form": {
+    "new": "Nouvelle scène",
+    "edit": "Modifier ma scène",
+    "url": "URL d'export",
+    "title": "Titre",
+    "optional": "facultatif",
+    "titlePlaceholder": "Ma scène",
+    "file": "Fichier Spline",
+    "fileOptional": "facultatif, pour montrer la scène d'origine",
+    "play": "Jouer la scène →",
+    "saveAndPlay": "Enregistrer et jouer →",
+    "cancel": "Annuler",
+    "help": "Dans Spline : <b>Export → Code</b>, puis copie l'URL <code>prod.spline.design</code>."
+  },
+  "templates": {
+    "title": "Pour commencer",
+    "tag": "Modèles",
+    "meta": "Modèle · interactions et audio",
+    "help": "« Spline ↗ » ouvre la scène d'origine dans l'éditeur : fais-en un remix pour partir de là."
+  },
+  "works": {
+    "title": "Mes créations",
+    "help": "Enregistrées dans ce navigateur. Le lien d'une scène sert aussi de sauvegarde : ouvre-le, puis « Modifier ».",
+    "empty": "Rien pour l'instant. Colle l'URL d'export d'une scène Spline ci-dessus : elle apparaîtra ici avec son lien.",
+    "untitled": "Scène sans titre",
+    "editing": "En cours",
+    "delete": "Supprimer de mes créations",
+    "confirmDelete": "Supprimer « {name} » de tes créations ?\nLe lien partagé continuera de marcher."
+  },
+  "actions": {
+    "play": "▶ Jouer",
+    "edit": "Modifier",
+    "sourceTitle": "Voir la scène d'origine dans Spline"
+  },
+  "time": {
+    "now": "à l'instant",
+    "minutes": "il y a {n} min",
+    "hours": "il y a {n} h",
+    "days": "il y a {n} j"
+  },
+  "loading": {
+    "default": "Chargement…",
+    "spline": "Chargement Spline…",
+    "build": "Construction de la scène…"
+  },
+  "hud": {
+    "home": "← Accueil",
+    "reset": "⌂ Recentrer",
+    "edit": "✎ Modifier",
+    "enterVr": "🥽 Entrer en VR",
+    "exitVr": "⏹ Quitter la VR",
+    "noWebxr": "🥽 WebXR non pris en charge",
+    "noHeadset": "🥽 Casque non détecté",
+    "noHeadsetTitle": "Ouvre depuis le navigateur du Meta Quest",
+    "preview": "🖱 Aperçu Spline · pas de casque",
+    "previewTitle": "Ouvre ce lien dans le navigateur du Meta Quest pour la VR"
+  },
+  "share": {
+    "label": "Lien de la scène",
+    "copy": "Copier",
+    "copied": "✓ Copié",
+    "copyManual": "Ctrl+C",
+    "thumbTitle": "Utiliser la vue actuelle comme aperçu du lien",
+    "thumbDone": "Aperçu mis à jour",
+    "thumbFailed": "Échec : réessaie hors VR, une fois le site en ligne"
+  },
+  "errors": {
+    "invalidLink": "Lien de scène invalide",
+    "load": "Erreur : {message}",
+    "loadDefault": "impossible de charger",
+    "notPublic": "Erreur : {message} — la scène est-elle bien exportée en URL publique dans Spline ?",
+    "vr": "Erreur VR : {message}",
+    "unknown": "inconnue"
+  },
+  "oob": {
+    "title": "Tu t'es éloigné",
+    "auto": "Recentrage automatique dans 3 s…",
+    "back": "Revenir maintenant"
+  }
+}

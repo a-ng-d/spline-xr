@@ -1,8 +1,8 @@
-// Aperçus des scènes : /api/thumb/<identifiant Spline>
-//   GET            → l'image JPEG de la scène, ou l'image par défaut si aucune
-//   GET ?exists=1  → { exists: boolean } (utilisé par l'app avant de capturer)
-//   PUT            → enregistre l'image envoyée (JPEG ≤ 500 Ko)
-// Stockage : Netlify Blobs (magasin clé → fichier, aucune base de données).
+// Scene previews: /api/thumb/<Spline ID>
+//   GET            → the scene's JPEG image, or the default image if none (?lang=fr: French one)
+//   GET ?exists=1  → { exists: boolean } (used by the app before capturing)
+//   PUT            → stores the uploaded image (JPEG ≤ 500 KB)
+// Storage: Netlify Blobs (key → file store, no database).
 import { getStore } from '@netlify/blobs'
 import { purgeCache } from '@netlify/functions'
 
@@ -12,7 +12,7 @@ const tag = id => `thumb-${id}`
 
 export default async (req, context) => {
   const id = context.params.id
-  if (!ID_RE.test(id ?? '')) return new Response('Identifiant invalide', { status: 400 })
+  if (!ID_RE.test(id ?? '')) return new Response('Invalid ID', { status: 400 })
 
   const store = getStore('thumbnails')
   const url = new URL(req.url)
@@ -24,11 +24,12 @@ export default async (req, context) => {
     }
     const data = await store.get(id, { type: 'arrayBuffer' })
     if (!data) {
-      // Pas encore d'aperçu : image par défaut, sans mise en cache pour que
-      // la capture apparaisse dès qu'elle existe
+      // No preview yet: default image, not cached so that the capture shows up as
+      // soon as it exists
+      const fallback = url.searchParams.get('lang') === 'fr' ? '/og-default-fr.jpg' : '/og-default.jpg'
       return new Response(null, {
         status: 302,
-        headers: { Location: '/og-default.jpg', 'Cache-Control': 'no-store' },
+        headers: { Location: fallback, 'Cache-Control': 'no-store' },
       })
     }
     return new Response(req.method === 'HEAD' ? null : data, {
@@ -43,19 +44,19 @@ export default async (req, context) => {
 
   if (req.method === 'PUT') {
     const len = Number(req.headers.get('content-length') ?? 0)
-    if (len > MAX_BYTES) return new Response('Image trop lourde', { status: 413 })
+    if (len > MAX_BYTES) return new Response('Image too large', { status: 413 })
     const buf = new Uint8Array(await req.arrayBuffer())
-    if (buf.length === 0 || buf.length > MAX_BYTES) return new Response('Taille invalide', { status: 413 })
-    // Signature JPEG : FF D8 FF
+    if (buf.length === 0 || buf.length > MAX_BYTES) return new Response('Invalid size', { status: 413 })
+    // JPEG signature: FF D8 FF
     if (buf[0] !== 0xff || buf[1] !== 0xd8 || buf[2] !== 0xff) {
-      return new Response('JPEG attendu', { status: 415 })
+      return new Response('JPEG expected', { status: 415 })
     }
     await store.set(id, buf, { metadata: { updated: new Date().toISOString() } })
     try { await purgeCache({ tags: [tag(id)] }) } catch (e) { console.warn('purgeCache', e.message) }
     return Response.json({ ok: true })
   }
 
-  return new Response('Méthode non autorisée', { status: 405, headers: { Allow: 'GET, HEAD, PUT' } })
+  return new Response('Method not allowed', { status: 405, headers: { Allow: 'GET, HEAD, PUT' } })
 }
 
 export const config = { path: '/api/thumb/:id' }

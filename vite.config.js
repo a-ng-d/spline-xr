@@ -1,7 +1,11 @@
 import { defineConfig } from 'vite'
+
 export default defineConfig({
   resolve: {
     alias: { three: 'super-three' }
   },
-  build: { chunkSizeWarningLimit: 3000 }
+  build: {
+    target: 'es2022', // top-level await (translations are loaded before the page renders)
+    chunkSizeWarningLimit: 3000
+  }
 })

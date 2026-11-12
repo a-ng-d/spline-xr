@@ -1,0 +1,40 @@
+name: Bug report
+description: Something does not work (a scene, VR controls, the home page…)
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for reporting! English or French are both fine. / Merci ! Anglais ou français, au choix.
+  - type: input
+    id: link
+    attributes:
+      label: Link that fails
+      description: The scene link (or the page address).
+      placeholder: https://spline-xr.netlify.app/s/…
+  - type: dropdown
+    id: engine
+    attributes:
+      label: Where did it happen?
+      options:
+        - In VR (headset or emulator)
+        - Preview without a headset (Spline runtime)
+        - Home page
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what did you expect?
+    validations:
+      required: true
+  - type: input
+    id: device
+    attributes:
+      label: Headset / computer, browser, input
+      placeholder: Meta Quest 3, Meta Quest Browser, hand tracking
+    validations:
+      required: true
+  - type: textarea
+    id: extra
+    attributes:
+      label: Screenshot, error message, console output (with ?debug)

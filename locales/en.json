@@ -1,0 +1,89 @@
+{
+  "lang": {
+    "switch": "Language"
+  },
+  "home": {
+    "pageTitle": "SplineXR",
+    "title": "Explore your Spline<br>scenes in <span>VR</span>",
+    "lead": "Paste the export URL of your Spline scene: you get a link to share, to open on a computer or in a Meta Quest headset."
+  },
+  "form": {
+    "new": "New scene",
+    "edit": "Edit my scene",
+    "url": "Export URL",
+    "title": "Title",
+    "optional": "optional",
+    "titlePlaceholder": "My scene",
+    "file": "Spline file",
+    "fileOptional": "optional, to show the original scene",
+    "play": "Play the scene →",
+    "saveAndPlay": "Save and play →",
+    "cancel": "Cancel",
+    "help": "In Spline: <b>Export → Code</b>, then copy the <code>prod.spline.design</code> URL."
+  },
+  "templates": {
+    "title": "Get started",
+    "tag": "Templates",
+    "meta": "Template · interactions and audio",
+    "help": "“Spline ↗” opens the original scene in the editor: remix it to start from there."
+  },
+  "works": {
+    "title": "My creations",
+    "help": "Saved in this browser. A scene's link is also its backup: open it, then “Edit”.",
+    "empty": "Nothing yet. Paste the export URL of a Spline scene above: it will show up here with its link.",
+    "untitled": "Untitled scene",
+    "editing": "Editing",
+    "delete": "Remove from my creations",
+    "confirmDelete": "Remove “{name}” from your creations?\nThe shared link will keep working."
+  },
+  "actions": {
+    "play": "▶ Play",
+    "edit": "Edit",
+    "sourceTitle": "See the original scene in Spline"
+  },
+  "time": {
+    "now": "just now",
+    "minutes": "{n} min ago",
+    "hours": "{n} h ago",
+    "days": "{n} d ago"
+  },
+  "loading": {
+    "default": "Loading…",
+    "spline": "Loading Spline…",
+    "build": "Building the scene…"
+  },
+  "hud": {
+    "home": "← Home",
+    "reset": "⌂ Reset position",
+    "edit": "✎ Edit",
+    "enterVr": "🥽 Enter VR",
+    "exitVr": "⏹ Exit VR",
+    "noWebxr": "🥽 WebXR not supported",
+    "noHeadset": "🥽 Headset not detected",
+    "noHeadsetTitle": "Open from the Meta Quest Browser",
+    "preview": "🖱 Spline preview · no headset",
+    "previewTitle": "Open this link in the Meta Quest browser for VR"
+  },
+  "share": {
+    "label": "Scene link",
+    "copy": "Copy",
+    "copied": "✓ Copied",
+    "copyManual": "Ctrl+C",
+    "thumbTitle": "Use the current view as the link preview",
+    "thumbDone": "Preview updated",
+    "thumbFailed": "Failed: try again outside VR, once the site is online"
+  },
+  "errors": {
+    "invalidLink": "Invalid scene link",
+    "load": "Error: {message}",
+    "loadDefault": "could not load",
+    "notPublic": "Error: {message} — is the scene exported as a public URL in Spline?",
+    "vr": "VR error: {message}",
+    "unknown": "unknown"
+  },
+  "oob": {
+    "title": "You wandered off",
+    "auto": "Automatic reset in 3 s…",
+    "back": "Come back now"
+  }
+}

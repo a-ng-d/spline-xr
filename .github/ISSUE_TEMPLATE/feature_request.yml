@@ -1,0 +1,19 @@
+name: Idea
+description: Suggest an improvement or a new feature
+labels: [enhancement]
+body:
+  - type: textarea
+    id: need
+    attributes:
+      label: What would you like to do?
+      description: Describe the need from the point of view of a student or a teacher.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: How could it work?
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else (examples, links, Spline scenes)
