@@ -1,5 +1,7 @@
 // Spline "Drag & Drop" events for the home-made engine, ported from the
-// runtime's dragdrop module (@splinetool/runtime 2.0.151) and driven by XR
+// runtime's dragdrop module (@splinetool/runtime 2.0.151, same logic in 2.0.203:
+// the 'custom' plane falls back to a camera-facing plane and the event's
+// top-level `actions` are dropped by the runtime's migration) and driven by XR
 // pointers instead of the mouse.
 //
 // Event data: { objects[], dropDestinations[], plane, planeMode, referenceFrame,
@@ -46,6 +48,7 @@ export function createDragDrop({ scene, entityByUuid, getEvents, toArray, runAct
           worldPosition0: p0.clone(),      // scene frame
           fromPosition: p0.clone(), pointStart: new Vector3(), pointEnd: new Vector3(),
           damping: data.dampingFactor ?? 1, paused: true, snapped: false, reset: false,
+          orientation: new Quaternion(),   // scene frame, used when snapped + autoOrient
           pointer: null, lastDest: null,
         }
       })
@@ -125,8 +128,9 @@ export function createDragDrop({ scene, entityByUuid, getEvents, toArray, runAct
     if (l[4] < l[5]) v.z = Math.min(Math.max(v.z, l[4]), l[5])
   }
 
-  // Place the item at a scene-frame position (runtime S())
-  function placeAt(it, pos) {
+  // Place the item at a scene-frame position (runtime S()); optional
+  // scene-frame orientation (auto-orient on a drop surface)
+  function placeAt(it, pos, orient) {
     const { obj } = it, { limits, referenceFrame } = it.ev.data
     const parent = obj.parent
     const toParent = parent && parent !== scene
@@ -142,6 +146,11 @@ export function createDragDrop({ scene, entityByUuid, getEvents, toArray, runAct
       clampLimits(obj.position, limits)
       obj.position.applyQuaternion(_q.invert()).add(it.position0)
     }
+    if (orient) {
+      // local = parent⁻¹ · orientation (rotation part only, like the runtime)
+      const qp = parent && parent !== scene ? relQuat(parent) : _q.identity()
+      obj.quaternion.copy(qp).invert().multiply(orient)
+    }
     obj.updateMatrixWorld(true)
   }
 
@@ -155,7 +164,8 @@ export function createDragDrop({ scene, entityByUuid, getEvents, toArray, runAct
     else target = _c.subVectors(it.pointEnd, it.pointStart).add(it.fromPosition)
     const delta = _v.subVectors(target, cur).divideScalar(it.damping)
     it.paused = !(it.damping > 1) || delta.length() < 0.01
-    placeAt(it, delta.add(cur))
+    const { drop, autoOrient } = it.ev.data
+    placeAt(it, delta.add(cur), drop && autoOrient && it.snapped ? it.orientation : null)
   }
 
   // ── Actions (the runtime treats drag/drop transitions as toggles) ────────
@@ -194,7 +204,7 @@ export function createDragDrop({ scene, entityByUuid, getEvents, toArray, runAct
         pointerRay(p, _ray)
         const { data } = ev
         it.snapped = false
-        let dest = null
+        let dest = null, entered = false
         if (data.drop) {
           dest = pickDrop(p, h => {
             for (let o = h.object; o; o = o.parent) if (o === it.obj) return false
@@ -222,10 +232,18 @@ export function createDragDrop({ scene, entityByUuid, getEvents, toArray, runAct
               it.fromPosition.addScaledVector(_normal, depth)
             } else it.fromPosition.addScaledVector(_normal, data.snapSurfaceOffset ?? 0)
           } else scenePosition(dest.object, it.fromPosition)
+          if (data.autoOrient) {
+            // Basis: X = up × n, Y = n × X, Z = n (runtime makeBasis)
+            _b.set(0, 1, 0).cross(_normal)
+            if (_b.length() < 1e-4) _b.set(-1, 0, 0).cross(_normal)
+            _b.normalize()
+            _c.crossVectors(_normal, _b)
+            it.orientation.setFromRotationMatrix(_m.makeBasis(_b, _c, _normal))
+          }
           it.pointStart.copy(it.fromPosition); it.pointEnd.copy(it.pointStart)
           it.damping = ev.snapDamping
           it.snapped = true
-          if (it.lastDest !== dest.object) { it.lastDest = dest.object; play(ev.dropActions) }
+          if (it.lastDest !== dest.object) { it.lastDest = dest.object; entered = true; play(ev.dropActions) }
         } else {
           const wasSnapped = !!it.lastDest
           it.lastDest = null
@@ -242,6 +260,11 @@ export function createDragDrop({ scene, entityByUuid, getEvents, toArray, runAct
           clearTimeout(ev.dragTimer)
           ev.dragTimer = setTimeout(() => { if (ev.dragFired) { ev.dragFired = false; revert(ev.dragActions) } }, 500)
         }
+        // Once settled on a destination, leave the item alone: the drop
+        // transition (often "put the hat on the head") animates it from there.
+        // With a mouse, Spline gets this for free when the pointer stops; an
+        // XR pointer never stops completely.
+        if (it.snapped && it.paused && !entered) continue
         step(it)
       }
     },

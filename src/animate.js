@@ -4,7 +4,7 @@
 //   - evaluating conditions and variables;
 //   - playing timeline animations.
 // Values (easings, units, order of application) are taken from the code of the
-// runtime @splinetool/runtime 2.0.151.
+// runtime @splinetool/runtime 2.0.151 (logic unchanged in 2.0.203).
 
 // ══════════════════════════════════════════════════════════════════════════════
 // COURBES

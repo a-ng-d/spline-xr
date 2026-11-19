@@ -17,8 +17,8 @@ The interface is available in **English and French**. The browser language is us
 
 | Layer | Technology |
 |---|---|
-| Preview without a headset | Official runtime `@splinetool/runtime` (pinned `2.0.151`), loaded on demand |
-| VR | `@splinetool/loader` (scene graph only) + three.js (`super-three`) + native WebXR |
+| Preview without a headset | Official runtime `@splinetool/runtime` (pinned `2.0.203`), loaded on demand |
+| VR | `@splinetool/loader` `2.0.203` (scene graph only) + three.js `0.186` + native WebXR |
 | Spline interactions in VR | Home-made event runner (`src/main.js`) and animation engine (`src/animate.js`) |
 | Hosting | Netlify: static site, a proxy for the Spline CDN, a Function + Blobs for link preview images, an Edge Function for preview tags |
 | Interface language | [Tolgee](https://tolgee.io) (`@tolgee/web`) with JSON files in `locales/` |
@@ -85,7 +85,7 @@ Hands use Meta's system ray (`targetRaySpace`) and the native WebXR pinch (`sele
 
 ## Compatibility of the VR engine
 
-The home-made engine (`src/animate.js`) reuses the easings, units and schedules of the `@splinetool/runtime` 2.0.151 code.
+The home-made engine (`src/animate.js`) reuses the easings, units and schedules of the `@splinetool/runtime` code (2.0.151, unchanged in 2.0.203).
 
 | Spline feature | Spline runtime (no headset) | VR engine |
 |---|---|---|
@@ -100,14 +100,15 @@ The home-made engine (`src/animate.js`) reuses the easings, units and schedules 
 | Timeline (play / pause / stop) | ✅ | ⚠️ position, rotation, scale tracks (faithful) and opacity (approximate); material, shape size, light, camera and cloner tracks ignored |
 | Animations of imported models | ✅ | ❌ |
 | Distance and State events | ✅ | ❌ |
-| Keyboard, scroll, drag and drop | ✅ | ❌ |
+| Drag and drop | ✅ | ✅ trigger or pinch on the object: planes, limits, damping, drop on destinations (centre or surface), auto-orient, reset, drag/drop actions |
+| Keyboard, scroll | ✅ | ❌ |
 | Look At / Follow | ✅ | ❌ |
 | Physics, collisions | ✅ | ❌ |
 | Game controls, scene transitions, create / destroy objects | ✅ | ❌ |
 | Particles, video, text inputs, API / AI | ✅ | ❓ untested |
 | Spline camera (orbit, zoom) | ✅ | Replaced by VR locomotion; the Spline camera gives the starting point |
 
-In practice, a scene designed for VR should rely on hover, click, state changes, sounds and simple timelines.
+In practice, a scene designed for VR should rely on hover, click, drag and drop, state changes, sounds and simple timelines.
 
 ## Translations
 
@@ -144,7 +145,7 @@ SplineXR stands on the work of others. Thank you to them.
 | Component | Use | License |
 |---|---|---|
 | [Spline](https://spline.design) runtime and loader (`@splinetool/runtime`, `@splinetool/loader`) | Preview without a headset, loading scenes for VR (the loader ships [howler.js](https://howlerjs.com) for audio) | Published on npm by Spline; use subject to Spline's terms of service ([spline.design](https://spline.design)) |
-| [three.js](https://threejs.org) via [`super-three`](https://www.npmjs.com/package/super-three) | WebXR rendering, controllers, hand tracking | MIT |
+| [three.js](https://threejs.org) | WebXR rendering, controllers, hand tracking | MIT |
 | [Tolgee](https://github.com/tolgee/tolgee-js) (`@tolgee/web`) | Interface translation | BSD-3-Clause |
 | [Netlify Blobs](https://github.com/netlify/blobs) (`@netlify/blobs`) and [`@netlify/functions`](https://github.com/netlify/primitives) | Storage of link preview images, cache purge | MIT |
 | [Vite](https://vitejs.dev) | Build | MIT |

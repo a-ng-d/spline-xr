@@ -1,10 +1,9 @@
-import SplineLoader from '@splinetool/loader'
 import {
   WebGLRenderer, PerspectiveCamera, Scene, AmbientLight, DirectionalLight,
   Color, Clock, Vector3, Group, Raycaster, Box3,
   BufferGeometry, Float32BufferAttribute, Line, LineBasicMaterial,
   SphereGeometry, MeshBasicMaterial, Mesh, RingGeometry, Matrix4, CircleGeometry,
-  Euler, Quaternion
+  Euler, Quaternion, LinearSRGBColorSpace
 } from 'three'
 import { readScenePath, scenePath, saveWork, sceneUrlFromId, fileUrlFromId } from './works.js'
 import { initHome } from './home.js'
@@ -129,6 +128,9 @@ const home = initHome({ onPlay: (scene, opts) => loadScene(scene, opts) })
 const renderer = new WebGLRenderer({ canvas: xrCanvas, antialias: true })
 renderer.setPixelRatio(window.devicePixelRatio)
 renderer.xr.enabled = true
+// Spline's materials already output display colours: no extra sRGB encoding
+// (matches the official runtime's colours; three r152+ would wash them out)
+renderer.outputColorSpace = LinearSRGBColorSpace
 renderer.setClearColor(new Color('#06060f'))
 
 const cameraRig = new Group()
@@ -994,7 +996,10 @@ function applyLightScale() {
   }
 }
 
-function loadSpline(url) {
+// Loaded on demand, like the runtime for the preview: the loader patches
+// three.js shader chunks when it is evaluated, which the preview must not see.
+async function loadSpline(url) {
+  const { default: SplineLoader } = await import('@splinetool/loader')
   return new Promise((resolve, reject) => {
     const loader = new SplineLoader()
     const orig = Vector3.prototype.copy

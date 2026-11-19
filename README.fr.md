@@ -17,8 +17,8 @@ L'interface existe en **anglais et en français**. La langue du navigateur est u
 
 | Couche | Technologie |
 |---|---|
-| Aperçu sans casque | Runtime officiel `@splinetool/runtime` (figé en `2.0.151`), chargé à la demande |
-| VR | `@splinetool/loader` (graphe de scène seul) + three.js (`super-three`) + WebXR natif |
+| Aperçu sans casque | Runtime officiel `@splinetool/runtime` (figé en `2.0.203`), chargé à la demande |
+| VR | `@splinetool/loader` `2.0.203` (graphe de scène seul) + three.js `0.186` + WebXR natif |
 | Interactions Spline en VR | Exécution maison des événements (`src/main.js`) et moteur d'animation (`src/animate.js`) |
 | Hébergement | Netlify : site statique, proxy vers le CDN Spline, une Function + Blobs pour les images d'aperçu, une Edge Function pour les balises d'aperçu |
 | Langue de l'interface | [Tolgee](https://tolgee.io) (`@tolgee/web`) avec des fichiers JSON dans `locales/` |
@@ -85,7 +85,7 @@ Les mains utilisent le rayon système de Meta (`targetRaySpace`) et le pincement
 
 ## Compatibilité du moteur VR
 
-Le moteur maison (`src/animate.js`) reprend les courbes, unités et calendriers du code de `@splinetool/runtime` 2.0.151.
+Le moteur maison (`src/animate.js`) reprend les courbes, unités et calendriers du code de `@splinetool/runtime` (2.0.151, inchangé en 2.0.203).
 
 | Élément Spline | Runtime Spline (sans casque) | Moteur VR |
 |---|---|---|
@@ -100,14 +100,15 @@ Le moteur maison (`src/animate.js`) reprend les courbes, unités et calendriers 
 | Timeline (play / pause / stop) | ✅ | ⚠️ pistes position, rotation, échelle (fidèles) et opacité (approchée) ; matériau, taille de forme, lumière, caméra et cloner ignorés |
 | Animations des modèles importés | ✅ | ❌ |
 | Événements Distance et État | ✅ | ❌ |
-| Clavier, scroll, glisser-déposer | ✅ | ❌ |
+| Glisser-déposer | ✅ | ✅ gâchette ou pincement sur l'objet : plans, limites, amortissement, dépôt sur des destinations (centre ou surface), orientation automatique, retour, actions de glisser / déposer |
+| Clavier, scroll | ✅ | ❌ |
 | Look At / Follow | ✅ | ❌ |
 | Physique, collisions | ✅ | ❌ |
 | Contrôles de jeu, changement de scène, création / destruction d'objets | ✅ | ❌ |
 | Particules, vidéo, champs de texte, API / IA | ✅ | ❓ non testé |
 | Caméra Spline (orbite, zoom) | ✅ | Remplacée par la locomotion VR ; la caméra Spline donne le point de départ |
 
-En pratique, une scène pensée pour la VR s'appuie sur le survol, le clic, les changements d'état, les sons et des timelines simples.
+En pratique, une scène pensée pour la VR s'appuie sur le survol, le clic, le glisser-déposer, les changements d'état, les sons et des timelines simples.
 
 ## Traductions
 
@@ -139,7 +140,7 @@ Déploiement : un site Netlify relié au dépôt, build `npm run build`, dossier
 
 ## Attributions
 
-Voir la section [Attributions du README anglais](README.md#attributions) : Spline (runtime et loader, avec howler.js), three.js via `super-three`, Tolgee, Netlify Blobs et Functions, Vite, DM Sans, Spline AR.
+Voir la section [Attributions du README anglais](README.md#attributions) : Spline (runtime et loader, avec howler.js), three.js, Tolgee, Netlify Blobs et Functions, Vite, DM Sans, Spline AR.
 
 « Spline » est une marque de Spline Design Inc. ; « Meta Quest » est une marque de Meta Platforms, Inc. Ce projet est indépendant et **n'est ni affilié, ni approuvé, ni sponsorisé** par Spline ou Meta.
 

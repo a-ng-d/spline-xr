@@ -34,10 +34,10 @@
   "dependencies": {
     "@netlify/blobs": "^11.1.8",
     "@netlify/functions": "^6.1.1",
-    "@splinetool/loader": "1.12.81",
-    "@splinetool/runtime": "2.0.151",
+    "@splinetool/loader": "2.0.203",
+    "@splinetool/runtime": "2.0.203",
     "@tolgee/web": "^7.3.0",
-    "super-three": "0.147.1"
+    "three": "0.186.0"
   },
   "devDependencies": {
     "vite": "^5.0.0"
