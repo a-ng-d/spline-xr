@@ -13,6 +13,7 @@ import {
   playTransition, playTimeline, evaluateExpression, coerceForVariable,
   updateAnimations, stopAllAnimations,
 } from './animate.js'
+import { createDragDrop } from './dragdrop.js'
 
 // ── URL parameters ─────────────────────────────────────────────────────────────
 //   ?debug        HUD + logs
@@ -350,6 +351,17 @@ function toArray(thing) {
 }
 function getEventsArray(obj) { return toArray(obj?.data?.events) }
 function hasEvents(obj) { return getEventsArray(obj).length > 0 }
+// Only pointer events make an object a pointer target. Other events (Drag &
+// Drop, Start, Variable Change, Key…) on a parent group must not turn every
+// mesh under it — say a character's hands — into a hover/click target.
+const POINTER_EVENTS = new Set(['MouseHover', 'MouseDown', 'MouseUp', 'MousePress'])
+function hasPointerEvents(obj) {
+  return getEventsArray(obj).some(evt => {
+    const e = evt?.data ?? evt
+    return POINTER_EVENTS.has(e?.type ?? evt?.type) && !e?.disabled
+  })
+}
+let dragDrop = null
 
 function collectObjects(splineScene) {
   interactiveObjects = []
@@ -361,7 +373,7 @@ function collectObjects(splineScene) {
     interactiveObjects.push(obj)
     let cur = obj
     while (cur && !cur.isScene) {
-      if (hasEvents(cur)) { meshToEntity.set(obj.uuid, cur); return }
+      if (hasPointerEvents(cur)) { meshToEntity.set(obj.uuid, cur); return }
       cur = cur.parent
     }
   })
@@ -381,8 +393,37 @@ function fireRay(source) {
   _origin.setFromMatrixPosition(source.matrixWorld)
   _dir.set(0, 0, -1).applyMatrix4(_mat).normalize()
   raycaster.set(_origin, _dir)
-  const hits = raycaster.intersectObjects(interactiveObjects, true)
-  return hits.length ? hits[0] : null
+  const hits = raycaster.intersectObjects(interactiveObjects, false)
+  // Nothing is hit closer than RAY_MIN_DIST from the controller/hand:
+  // contact is the poke's job.
+  return hits.find(h => h.distance >= RAY_MIN_DIST && isRaycastable(h.object)) ?? null
+}
+
+// First hit along a pointer that passes the filter (drop destinations)
+function pickAlong(p, filter) {
+  _mat.extractRotation(p.ctrl.matrixWorld)
+  _origin.setFromMatrixPosition(p.ctrl.matrixWorld)
+  _dir.set(0, 0, -1).applyMatrix4(_mat).normalize()
+  raycaster.set(_origin, _dir)
+  return raycaster.intersectObjects(interactiveObjects, false)
+    .find(h => h.distance >= RAY_MIN_DIST && isRaycastable(h.object) && filter(h)) ?? null
+}
+
+const RAY_MIN_DIST = 0.05   // metres
+const _camDir = new Vector3(), _sceneInv = new Matrix4()
+function cameraDirInScene() {
+  renderer.xr.getCamera().getWorldDirection(_camDir)
+  const root = splineContext?.scene
+  if (root) _camDir.transformDirection(_sceneInv.copy(root.matrixWorld).invert())
+  return _camDir
+}
+// Spline ignores hidden objects for mouse events: so do we. The raycaster
+// itself tests every mesh, visible or not (hidden state variants, etc.).
+function isRaycastable(obj) {
+  const mats = Array.isArray(obj.material) ? obj.material : [obj.material]
+  if (!mats.some(m => m && m.visible !== false)) return false
+  for (let o = obj; o; o = o.parent) if (!o.visible) return false
+  return true
 }
 
 // ── Audio ────────────────────────────────────────────────────────────────────
@@ -534,10 +575,11 @@ function onSelectStart(p) {
   // The ray may not have been evaluated yet this frame (transient pointer)
   if (!p.hit) { p.hit = fireRay(p.ctrl); p.entity = entityOf(p.hit) }
   if (p.poking) return            // the finger is already touching: the poke handles it
+  const dragging = !!(p.hit && dragDrop?.begin(p, p.hit.object, cameraDirInScene()))
   if (p.entity) {
     p.pressEntity = p.entity
     triggerEvent(p.entity, 'MouseDown')
-  } else {
+  } else if (!dragging) {
     // Pinch / trigger in empty space: grab the scene
     p.selectGrab = true
     setGrab(p, true)
@@ -546,6 +588,7 @@ function onSelectStart(p) {
 
 function onSelectEnd(p) {
   p.selecting = false
+  dragDrop?.end(p)
   if (p.selectGrab) { p.selectGrab = false; if (!p.squeezing) setGrab(p, false) }
   const pressed = p.pressEntity
   p.pressEntity = null
@@ -572,7 +615,7 @@ function pokeTest(p) {
   _pokeDir.divideScalar(len)
   raycaster.set(_dst, _pokeDir)
   raycaster.far = len + (p.poking ? POKE_RELEASE : POKE_DEPTH)
-  const hits = raycaster.intersectObjects(interactiveObjects, true)
+  const hits = raycaster.intersectObjects(interactiveObjects, false).filter(h => isRaycastable(h.object))
   raycaster.far = Infinity
   return hits.length ? hits[0] : null
 }
@@ -652,15 +695,16 @@ function updatePointerVisuals(p) {
   cursor.group.visible = active && !!hit
   if (!active) return
   ray.scale.z = hit ? hit.distance : RAY_IDLE_LENGTH
-  ray.material.opacity = p.entity ? 0.85 : 0.4
+  const target = !!(p.entity || p.dragItem)
+  ray.material.opacity = target ? 0.85 : 0.4
   if (hit) {
     // Cursor at the hit point, facing the camera, constant apparent size
     cursor.group.position.copy(hit.point)
     renderer.xr.getCamera().getWorldPosition(_camPos)
     cursor.group.lookAt(_camPos)
-    const s = hit.distance * CURSOR_ANGULAR * (p.selecting ? 0.7 : 1) * (p.entity ? 1.3 : 1)
+    const s = hit.distance * CURSOR_ANGULAR * (p.selecting ? 0.7 : 1) * (target ? 1.3 : 1)
     cursor.group.scale.setScalar(s)
-    cursor.ringMat.opacity = p.entity ? 1 : 0.5
+    cursor.ringMat.opacity = target ? 1 : 0.5
   }
 }
 
@@ -705,6 +749,7 @@ function updateControls(dt) {
     } else {
       p.hit = fireRay(p.ctrl)
       p.entity = entityOf(p.hit)
+      p.dragItem = p.hit ? dragDrop?.itemOf(p.hit.object) ?? null : null
       setHover(p, p.entity)
       updatePointerVisuals(p)
     }
@@ -758,15 +803,22 @@ function updateControls(dt) {
     p.model.stick.rotation.z = -jx * 0.25
   }
 
-  // 5. Scene grab (one or two hands)
+  // 5. Drag & Drop (Spline event): follow the pointers, snap, reset
+  dragDrop?.update(cameraDirInScene(), pickAlong)
+
+  // 6. Scene grab (one or two hands)
   updateWorldGrab()
 
   if (DEBUG && (++debugCounter % 20 === 0)) {
     debugLog(pointers.map(p => {
       if (!p.source) return `[${p.i}] —`
       const kind = p.source.hand ? 'hand' : 'controller'
-      const target = p.poking ? 'contact' : p.hit ? (p.hit.object.name || 'mesh') : 'nothing'
-      const flags = [p.selecting && 'PRESS', p.poking && 'POKE', p.grabbing && 'GRAB'].filter(Boolean).join(' ')
+      const h = p.hit
+      const target = p.poking ? 'contact' : h
+        ? `${h.object.name || 'mesh'} @ ${(h.distance * 100).toFixed(0)} cm`
+        : 'nothing'
+      const flags = [p.selecting && 'PRESS', p.poking && 'POKE', p.grabbing && 'GRAB',
+        dragDrop?.isDragging(p) && 'DRAG', !dragDrop?.isDragging(p) && p.dragItem && 'draggable'].filter(Boolean).join(' ')
       return `[${p.i}] ${p.source.handedness} ${kind} ${p.source.targetRayMode}\n    aim: ${target} | entity: ${p.entity?.name ?? '—'} ${flags}`
     }).join('\n') + `\nmeshes: ${interactiveObjects.length} | hovers: ${hoverCount.size} | scale: ${(world.scale.x * 1000).toFixed(2)} mm/u`)
   }
@@ -858,6 +910,11 @@ function buildScene(splineScene) {
   if (!shared) warn('sharedAssets not found: transitions and audio limited')
   splineContext = { scene: splineScene, shared, entityByUuid: new Map() }
   collectObjects(splineScene)
+  world.updateMatrixWorld(true)      // drag items record their start position
+  dragDrop = createDragDrop({
+    scene: splineScene, entityByUuid: splineContext.entityByUuid,
+    getEvents: getEventsArray, toArray, runActions, log,
+  })
   // Variables bound to object properties: the loader needs a context
   // { scene.find(uuid), shared } that it never creates itself
   if (typeof splineScene.find !== 'function') splineScene.find = id => splineContext.entityByUuid.get(id)
@@ -1014,7 +1071,7 @@ async function loadScene(scene, { fromRoute = false, save = false, editKey = nul
 // Stops the current engine, whichever it is
 function teardownEngines() {
   renderer.setAnimationLoop(null)
-  if (threeScene) { detachXR(threeScene); stopAllAudio(); stopAllAnimations(); threeScene = null }
+  if (threeScene) { detachXR(threeScene); stopAllAudio(); stopAllAnimations(); dragDrop?.dispose(); dragDrop = null; threeScene = null }
   xrCanvas.classList.remove('active')
   if (preview) { preview.dispose(); preview = null }
   thumbRequest?.resolve(false); thumbRequest = null
