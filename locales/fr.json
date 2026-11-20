@@ -5,7 +5,8 @@
   "home": {
     "pageTitle": "SplineXR",
     "title": "Explore en <span>VR</span><br>tes scènes Spline",
-    "lead": "Colle l'URL d'export de ta scène Spline : tu obtiens un lien à partager, à ouvrir sur ordinateur ou dans un casque Meta Quest."
+    "lead": "Colle l'URL d'export de ta scène Spline : tu obtiens un lien à partager, à ouvrir sur ordinateur ou dans un casque Meta Quest.",
+    "footer": "Conçu par <a href=\"https://yelbolt.co\" target=\"_blank\" rel=\"noopener\">Aurélien Grimaud</a> · <a href=\"https://github.com/a-ng-d/spline-xr/blob/main/LICENSE\" target=\"_blank\" rel=\"noopener\">Licence MIT</a>"
   },
   "form": {
     "new": "Nouvelle scène",
