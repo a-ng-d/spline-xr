@@ -72,6 +72,8 @@ N'importe qui ouvrant le lien peut remplacer son aperçu (il n'y a pas de compte
 | Rayon (manette ou main) | Survol Spline (MouseHover) + curseur |
 | Gâchette ou pincement sur un objet | Clic Spline (MouseDown / MouseUp / MousePress) |
 | Toucher un objet du bout de l'index | Clic Spline (poke) |
+| Pincement, gâchette ou grip avec la main sur un objet déplaçable | Le prendre en main (glisser-déposer Spline) ; le lâcher près d'une destination pour l'y déposer |
+| Gâchette ou pincement avec le rayon sur un objet déplaçable | L'objet vient dans la main |
 | Gâchette ou pincement dans le vide, ou bouton grip | Saisir la scène et la déplacer |
 | Saisie à deux mains, écarter / rapprocher | Agrandir / réduire la scène |
 | Joystick gauche | Déplacement |
@@ -100,7 +102,7 @@ Le moteur maison (`src/animate.js`) reprend les courbes, unités et calendriers 
 | Timeline (play / pause / stop) | ✅ | ⚠️ pistes position, rotation, échelle (fidèles) et opacité (approchée) ; matériau, taille de forme, lumière, caméra et cloner ignorés |
 | Animations des modèles importés | ✅ | ❌ |
 | Événements Distance et État | ✅ | ❌ |
-| Glisser-déposer | ✅ | ✅ gâchette ou pincement sur l'objet : plans, limites, amortissement, dépôt sur des destinations (centre ou surface), orientation automatique, retour, actions de glisser / déposer |
+| Glisser-déposer | ✅ | ✅ tenu dans la main : pincement, gâchette ou grip à portée, ou gâchette / pincement avec le rayon pour l'amener dans la main. Dépôt sur des destinations (centre ou surface), orientation automatique, retour, rails sur un axe, limites, actions de glisser / déposer |
 | Clavier, scroll | ✅ | ❌ |
 | Look At / Follow | ✅ | ❌ |
 | Physique, collisions | ✅ | ❌ |

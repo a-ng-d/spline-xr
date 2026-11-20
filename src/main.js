@@ -312,6 +312,7 @@ const pointers = [0, 1].map(i => {
     poking: null,                          // entity touched with the finger
     grabbing: false, grabPrev: null,       // scene grab
     squeezing: false, selectGrab: false,   // what started the grab (grip / pinch)
+    holding: null,                         // Drag & Drop object in hand: 'select' | 'squeeze'
   }
   ctrl.addEventListener('connected', e => {
     p.source = e.data
@@ -323,14 +324,24 @@ const pointers = [0, 1].map(i => {
     setHover(p, null)
     p.source = null; p.hit = null; p.entity = null; p.selecting = false; p.pressEntity = null
     p.squeezing = false; p.selectGrab = false
+    releaseHeld(p)
     setGrab(p, false)
     ray.visible = false; cursor.group.visible = false
   })
   ctrl.addEventListener('selectstart', () => onSelectStart(p))
   ctrl.addEventListener('selectend',   () => onSelectEnd(p))
   // Controller grip button: grabs the scene, whatever the target
-  ctrl.addEventListener('squeezestart', () => { p.squeezing = true; setGrab(p, true) })
-  ctrl.addEventListener('squeezeend',   () => { p.squeezing = false; if (!p.selectGrab) setGrab(p, false) })
+  // (or an object within reach, for Drag & Drop)
+  ctrl.addEventListener('squeezestart', () => {
+    p.squeezing = true
+    if (!p.holding && tryNearGrab(p, 'squeeze')) return
+    setGrab(p, true)
+  })
+  ctrl.addEventListener('squeezeend', () => {
+    p.squeezing = false
+    if (p.holding === 'squeeze') { releaseHeld(p); return }
+    if (!p.selectGrab) setGrab(p, false)
+  })
   return p
 })
 
@@ -401,23 +412,42 @@ function fireRay(source) {
   return hits.find(h => h.distance >= RAY_MIN_DIST && isRaycastable(h.object)) ?? null
 }
 
-// First hit along a pointer that passes the filter (drop destinations)
-function pickAlong(p, filter) {
-  _mat.extractRotation(p.ctrl.matrixWorld)
-  _origin.setFromMatrixPosition(p.ctrl.matrixWorld)
-  _dir.set(0, 0, -1).applyMatrix4(_mat).normalize()
-  raycaster.set(_origin, _dir)
-  return raycaster.intersectObjects(interactiveObjects, false)
-    .find(h => h.distance >= RAY_MIN_DIST && isRaycastable(h.object) && filter(h)) ?? null
-}
-
 const RAY_MIN_DIST = 0.05   // metres
-const _camDir = new Vector3(), _sceneInv = new Matrix4()
-function cameraDirInScene() {
-  renderer.xr.getCamera().getWorldDirection(_camDir)
-  const root = splineContext?.scene
-  if (root) _camDir.transformDirection(_sceneInv.copy(root.matrixWorld).invert())
-  return _camDir
+
+// ── The hand that holds things (Drag & Drop) ──────────────────────────────────
+// Tracked hand: between thumb and index tips, oriented like the wrist.
+// Controller: the grip (palm).
+const _hp = new Vector3(), _ht = new Vector3(), _hq = new Quaternion(), _one = new Vector3(1, 1, 1)
+function handMatrixOf(p, target) {
+  if (!p.source) return null
+  if (p.source.hand) {
+    const tip = p.hand.joints['index-finger-tip'], thumb = p.hand.joints['thumb-tip'], wrist = p.hand.joints['wrist']
+    if (!tip?.visible || !thumb?.visible || !wrist?.visible) return null
+    tip.getWorldPosition(_hp); thumb.getWorldPosition(_ht); _hp.add(_ht).multiplyScalar(0.5)
+    wrist.getWorldQuaternion(_hq)
+    return target.compose(_hp, _hq, _one)
+  }
+  p.grip.updateWorldMatrix(true, false)
+  p.grip.matrixWorld.decompose(_hp, _hq, _ht)
+  return target.compose(_hp, _hq, _one)
+}
+const _handM = new Matrix4()
+function handPoint(p, target) {
+  return handMatrixOf(p, _handM) ? target.setFromMatrixPosition(_handM) : null
+}
+// Pick up a draggable object within reach of the hand
+const _reach = new Vector3()
+function tryNearGrab(p, by) {
+  if (!dragDrop || !handPoint(p, _reach)) return false
+  const it = dragDrop.nearItem(_reach)
+  if (!it || !dragDrop.grab(p, it, _handM, false)) return false
+  p.holding = by
+  return true
+}
+function releaseHeld(p) {
+  if (!p.holding) return
+  p.holding = null
+  dragDrop?.release(p)
 }
 // Spline ignores hidden objects for mouse events: so do we. The raycaster
 // itself tests every mesh, visible or not (hidden state variants, etc.).
@@ -576,12 +606,17 @@ function onSelectStart(p) {
   p.selecting = true
   // The ray may not have been evaluated yet this frame (transient pointer)
   if (!p.hit) { p.hit = fireRay(p.ctrl); p.entity = entityOf(p.hit) }
+  // Drag & Drop: an object within reach is taken in the hand; one under the
+  // ray flies into the hand
+  if (p.holding) return           // already holding something (grip)
+  if (tryNearGrab(p, 'select')) return
+  if (p.hit && dragDrop?.itemOf(p.hit.object) && handMatrixOf(p, _handM)
+      && dragDrop.grab(p, dragDrop.itemOf(p.hit.object), _handM, true)) { p.holding = 'select'; return }
   if (p.poking) return            // the finger is already touching: the poke handles it
-  const dragging = !!(p.hit && dragDrop?.begin(p, p.hit.object, cameraDirInScene()))
   if (p.entity) {
     p.pressEntity = p.entity
     triggerEvent(p.entity, 'MouseDown')
-  } else if (!dragging) {
+  } else {
     // Pinch / trigger in empty space: grab the scene
     p.selectGrab = true
     setGrab(p, true)
@@ -590,7 +625,7 @@ function onSelectStart(p) {
 
 function onSelectEnd(p) {
   p.selecting = false
-  dragDrop?.end(p)
+  if (p.holding === 'select') releaseHeld(p)
   if (p.selectGrab) { p.selectGrab = false; if (!p.squeezing) setGrab(p, false) }
   const pressed = p.pressEntity
   p.pressEntity = null
@@ -805,8 +840,8 @@ function updateControls(dt) {
     p.model.stick.rotation.z = -jx * 0.25
   }
 
-  // 5. Drag & Drop (Spline event): follow the pointers, snap, reset
-  dragDrop?.update(cameraDirInScene(), pickAlong)
+  // 5. Drag & Drop (Spline event): objects in hand follow it; snap, reset
+  dragDrop?.update(dt, handMatrixOf)
 
   // 6. Scene grab (one or two hands)
   updateWorldGrab()
@@ -820,7 +855,9 @@ function updateControls(dt) {
         ? `${h.object.name || 'mesh'} @ ${(h.distance * 100).toFixed(0)} cm`
         : 'nothing'
       const flags = [p.selecting && 'PRESS', p.poking && 'POKE', p.grabbing && 'GRAB',
-        dragDrop?.isDragging(p) && 'DRAG', !dragDrop?.isDragging(p) && p.dragItem && 'draggable'].filter(Boolean).join(' ')
+        p.holding && `HOLD ${dragDrop?.heldBy(p)?.obj.name ?? ''}`,
+        !p.holding && p.dragItem && 'draggable',
+        !p.holding && handPoint(p, _reach) && dragDrop?.nearItem(_reach) && 'in reach'].filter(Boolean).join(' ')
       return `[${p.i}] ${p.source.handedness} ${kind} ${p.source.targetRayMode}\n    aim: ${target} | entity: ${p.entity?.name ?? '—'} ${flags}`
     }).join('\n') + `\nmeshes: ${interactiveObjects.length} | hovers: ${hoverCount.size} | scale: ${(world.scale.x * 1000).toFixed(2)} mm/u`)
   }

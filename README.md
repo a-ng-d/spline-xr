@@ -72,6 +72,8 @@ Anyone opening the link can replace its preview (there are no accounts).
 | Ray (controller or hand) | Spline hover (MouseHover) + cursor |
 | Trigger or pinch on an object | Spline click (MouseDown / MouseUp / MousePress) |
 | Touching an object with the index fingertip | Spline click (poke) |
+| Pinch, trigger or grip with the hand on a draggable object | Take it in the hand (Spline drag and drop); let go near a destination to drop it |
+| Trigger or pinch with the ray on a draggable object | The object comes into the hand |
 | Trigger or pinch in empty space, or grip button | Grab and move the scene |
 | Two-hand grab, hands apart / together | Scale the scene up / down |
 | Left thumbstick | Move |
@@ -100,7 +102,7 @@ The home-made engine (`src/animate.js`) reuses the easings, units and schedules 
 | Timeline (play / pause / stop) | ✅ | ⚠️ position, rotation, scale tracks (faithful) and opacity (approximate); material, shape size, light, camera and cloner tracks ignored |
 | Animations of imported models | ✅ | ❌ |
 | Distance and State events | ✅ | ❌ |
-| Drag and drop | ✅ | ✅ trigger or pinch on the object: planes, limits, damping, drop on destinations (centre or surface), auto-orient, reset, drag/drop actions |
+| Drag and drop | ✅ | ✅ held in the hand: pinch, trigger or grip within reach, or trigger / pinch with the ray to bring it to the hand. Drop on destinations (centre or surface), auto-orient, reset, single-axis rails, limits, drag/drop actions |
 | Keyboard, scroll | ✅ | ❌ |
 | Look At / Follow | ✅ | ❌ |
 | Physics, collisions | ✅ | ❌ |
