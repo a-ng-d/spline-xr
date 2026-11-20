@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "Open-source WebXR for students: play Spline scenes in VR on Meta Quest with a simple link. Spline runtime preview without a headset, EN/FR.",
   "license": "MIT",
-  "author": "a-ng-d",
+  "author": "Aurélien Grimaud <https://an.gd>",
   "homepage": "https://spline-xr.netlify.app",
   "repository": {
     "type": "git",
