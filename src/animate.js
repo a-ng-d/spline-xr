@@ -91,6 +91,14 @@ export function updateAnimations(now = performance.now()) {
   }
 }
 
+// Stops what is animating an entity (state tweens and transition sequences)
+export function stopAnimationsOf(entity) {
+  const r = running.get(entity)
+  if (r?.anim) r.anim.cancelled = true
+  running.delete(entity)
+  entity._xrSequence = null
+}
+
 export function stopAllAnimations() {
   for (const a of active) a.cancelled = true
   active.clear()

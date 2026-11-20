@@ -10,7 +10,7 @@ import { initHome } from './home.js'
 import { initI18n, t, setText, translateDom, mountLanguageSwitch } from './i18n.js'
 import {
   playTransition, playTimeline, evaluateExpression, coerceForVariable,
-  updateAnimations, stopAllAnimations,
+  updateAnimations, stopAllAnimations, stopAnimationsOf,
 } from './animate.js'
 import { createDragDrop } from './dragdrop.js'
 
@@ -840,10 +840,7 @@ function updateControls(dt) {
     p.model.stick.rotation.z = -jx * 0.25
   }
 
-  // 5. Drag & Drop (Spline event): objects in hand follow it; snap, reset
-  dragDrop?.update(dt, handMatrixOf)
-
-  // 6. Scene grab (one or two hands)
+  // 5. Scene grab (one or two hands)
   updateWorldGrab()
 
   if (DEBUG && (++debugCounter % 20 === 0)) {
@@ -953,6 +950,7 @@ function buildScene(splineScene) {
   dragDrop = createDragDrop({
     scene: splineScene, entityByUuid: splineContext.entityByUuid,
     getEvents: getEventsArray, toArray, runActions, log,
+    resetState: target => { stopAnimationsOf(target); target.changeSelectedState(null, splineContext, true) },
   })
   // Variables bound to object properties: the loader needs a context
   // { scene.find(uuid), shared } that it never creates itself
@@ -1083,8 +1081,12 @@ async function loadScene(scene, { fromRoute = false, save = false, editKey = nul
       xrCanvas.classList.add('active')
       resize()
       renderer.setAnimationLoop(() => {
-        updateControls(clock.getDelta())
+        const dt = clock.getDelta()
+        updateControls(dt)
         updateAnimations(performance.now())
+        // Drag & Drop after the animations: the hand has the last word on
+        // the object it holds (a drag transition may animate it too)
+        dragDrop?.update(dt, handMatrixOf)
         renderer.render(threeScene, camera)
         if (thumbRequest) takeThumbnail()
       })
