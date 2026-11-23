@@ -176,6 +176,16 @@ input[type=text].error { border-color: var(--danger); animation: shake .3s }
   display: none; justify-content: center; gap: 12px; padding: 0 16px;
 }
 #hud.visible { display: flex }
+/* Signature under the scene's buttons */
+.scene-footer {
+  position: fixed; bottom: 6px; left: 50%; transform: translateX(-50%); z-index: 20;
+  display: none; white-space: nowrap; max-width: calc(100% - 32px); overflow: hidden; text-overflow: ellipsis;
+  font-size: 11px; color: rgba(255,255,255,.72); padding: 3px 12px; border-radius: 100px;
+  background: rgba(6,6,15,.8); backdrop-filter: blur(12px);
+}
+#hud.visible ~ .scene-footer { display: block }
+.scene-footer a { color: inherit; text-decoration: underline; text-underline-offset: 2px }
+.scene-footer a:hover { color: var(--accent) }
 .hud-btn {
   display: flex; align-items: center; gap: 8px;
   background: rgba(6,6,15,.8); border: 1px solid var(--border);
@@ -321,6 +331,7 @@ input[type=text].error { border-color: var(--danger); animation: shake .3s }
   <button class="hud-btn" id="btn-reset" data-i18n="hud.reset"></button>
   <button class="hud-btn" id="btn-vr" disabled data-i18n="hud.enterVr"></button>
 </div>
+<footer class="scene-footer" data-i18n-html="home.footer"></footer>
 
 <div id="share-bar">
   <span id="share-label" data-i18n="share.label"></span>
