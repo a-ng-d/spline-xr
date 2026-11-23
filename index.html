@@ -179,7 +179,7 @@ input[type=text].error { border-color: var(--danger); animation: shake .3s }
 /* Signature under the scene's buttons */
 .scene-footer {
   position: fixed; bottom: 6px; left: 50%; transform: translateX(-50%); z-index: 20;
-  display: none; white-space: nowrap; max-width: calc(100% - 32px); overflow: hidden; text-overflow: ellipsis;
+  display: none; width: max-content; max-width: calc(100% - 32px); text-align: center;
   font-size: 11px; color: rgba(255,255,255,.72); padding: 3px 12px; border-radius: 100px;
   background: rgba(6,6,15,.8); backdrop-filter: blur(12px);
 }

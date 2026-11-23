@@ -6,7 +6,7 @@
     "pageTitle": "SplineXR",
     "title": "Explore your Spline<br>scenes in <span>VR</span>",
     "lead": "Paste the export URL of your Spline scene: you get a link to share, to open on a computer or in a Meta Quest headset.",
-    "footer": "Made by <a href=\"https://an.gd\" target=\"_blank\" rel=\"noopener\">Aurélien Grimaud</a>, <a href=\"https://yelbolt.co\" target=\"_blank\" rel=\"noopener\">Yelbolt</a> founder · <a href=\"https://github.com/a-ng-d/spline-xr/blob/main/LICENSE\" target=\"_blank\" rel=\"noopener\">MIT License</a>"
+    "footer": "Made by <a href=\"https://an.gd\" target=\"_blank\" rel=\"noopener\">Aurélien Grimaud</a>, <a href=\"https://yelbolt.co\" target=\"_blank\" rel=\"noopener\">Yelbolt</a> founder · <a href=\"https://github.com/a-ng-d/spline-xr/blob/main/LICENSE\" target=\"_blank\" rel=\"noopener\">MIT License</a> · <a href=\"https://github.com/a-ng-d/spline-xr\" target=\"_blank\" rel=\"noopener\">GitHub</a> · Not affiliated with Spline"
   },
   "form": {
     "new": "New scene",
