@@ -1,10 +1,10 @@
-# SplineXR
+# Spline XR
 
 **Play your Spline scenes in VR on a Meta Quest headset — in the browser, with a simple link.**
 
 [Live site](https://spline-xr.netlify.app) · [Français](README.fr.md) · [Contributing](CONTRIBUTING.md)
 
-SplineXR is an open-source WebXR tool made for design students. No app to install, no code, no Node.js for the people who use it: design a scene in [Spline](https://spline.design), paste its export link, get a link to share. The same link opens on a computer (mouse preview) and in a Meta Quest headset (immersive VR, with controllers or hand tracking).
+Spline XR is an open-source WebXR tool made for design students. No app to install, no code, no Node.js for the people who use it: design a scene in [Spline](https://spline.design), paste its export link, get a link to share. The same link opens on a computer (mouse preview) and in a Meta Quest headset (immersive VR, with controllers or hand tracking).
 
 - **No headset**: the scene runs in the official Spline runtime — exact rendering, animations, states, sounds and mouse interactions.
 - **Headset detected**: the scene runs in a home-made WebXR engine that replays Spline interactions with the controllers' ray, the trigger, pinching or a fingertip touch.
@@ -142,7 +142,7 @@ Deployment: a Netlify site linked to the repository, build `npm run build`, publ
 
 ## Attributions
 
-SplineXR stands on the work of others. Thank you to them.
+Spline XR stands on the work of others. Thank you to them.
 
 | Component | Use | License |
 |---|---|---|
@@ -152,8 +152,7 @@ SplineXR stands on the work of others. Thank you to them.
 | [Netlify Blobs](https://github.com/netlify/blobs) (`@netlify/blobs`) and [`@netlify/functions`](https://github.com/netlify/primitives) | Storage of link preview images, cache purge | MIT |
 | [Vite](https://vitejs.dev) | Build | MIT |
 | [Unoff UI](https://github.com/yelbolt/unoff-ui) (`@unoff/ui`) | Yelbolt design tokens: colours, radii, type, and component tokens (button, input, card, chip…) | MIT |
-| [Lexend](https://fonts.google.com/specimen/Lexend) via [`@fontsource-variable/lexend`](https://fontsource.org/fonts/lexend) | Typeface (Yelbolt theme), served with the app | SIL Open Font License 1.1 |
-| [DM Sans](https://fonts.google.com/specimen/DM+Sans) | Typeface of the default link-preview images | SIL Open Font License 1.1 |
+| [Lexend](https://fonts.google.com/specimen/Lexend) via [`@fontsource-variable/lexend`](https://fontsource.org/fonts/lexend) | Typeface (Yelbolt theme), served with the app and used in the default link-preview images | SIL Open Font License 1.1 |
 | [Spline AR](https://github.com/a-ng-d/spline-ar) | "My creations" principle, `src/i18n.js` | Same author |
 
 "Spline" is a trademark of Spline Design Inc.; "Meta Quest" is a trademark of Meta Platforms, Inc. This project is independent and **not affiliated with, endorsed or sponsored by** Spline or Meta.

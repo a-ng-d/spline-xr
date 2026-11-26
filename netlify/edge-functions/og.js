@@ -5,13 +5,13 @@ const ID_RE = /^[A-Za-z0-9_-]{6,64}$/
 
 const STRINGS = {
   en: {
-    title: 'Spline scene in VR — SplineXR',
-    titled: t => `${t} — SplineXR`,
+    title: 'Spline scene in VR — Spline XR',
+    titled: t => `${t} — Spline XR`,
     description: 'Explore this 3D scene in the browser or in VR on a Meta Quest headset.',
   },
   fr: {
-    title: 'Scène Spline en VR — SplineXR',
-    titled: t => `${t} — SplineXR`,
+    title: 'Scène Spline en VR — Spline XR',
+    titled: t => `${t} — Spline XR`,
     description: 'Explore cette scène 3D dans le navigateur ou en VR sur un casque Meta Quest.',
   },
 }

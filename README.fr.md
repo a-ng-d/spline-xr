@@ -1,10 +1,10 @@
-# SplineXR
+# Spline XR
 
 **Joue tes scènes Spline en VR dans un casque Meta Quest — dans le navigateur, avec un simple lien.**
 
 [Site en ligne](https://spline-xr.netlify.app) · [English](README.md) · [Contribuer](CONTRIBUTING.md)
 
-SplineXR est un outil WebXR open source pensé pour des étudiants en design. Pas d'appli à installer, pas de code, pas de Node.js pour celles et ceux qui l'utilisent : on crée une scène dans [Spline](https://spline.design), on colle son lien d'export, on obtient un lien à partager. Le même lien s'ouvre sur ordinateur (aperçu à la souris) et dans un casque Meta Quest (VR immersive, avec les manettes ou les mains).
+Spline XR est un outil WebXR open source pensé pour des étudiants en design. Pas d'appli à installer, pas de code, pas de Node.js pour celles et ceux qui l'utilisent : on crée une scène dans [Spline](https://spline.design), on colle son lien d'export, on obtient un lien à partager. Le même lien s'ouvre sur ordinateur (aperçu à la souris) et dans un casque Meta Quest (VR immersive, avec les manettes ou les mains).
 
 - **Sans casque** : la scène tourne dans le runtime officiel de Spline — rendu, animations, états, sons et interactions à la souris exacts.
 - **Casque détecté** : la scène tourne dans un moteur WebXR maison qui rejoue les interactions Spline avec le rayon des manettes, la gâchette, le pincement ou le toucher du bout du doigt.
@@ -142,7 +142,7 @@ Déploiement : un site Netlify relié au dépôt, build `npm run build`, dossier
 
 ## Attributions
 
-Voir la section [Attributions du README anglais](README.md#attributions) : Spline (runtime et loader, avec howler.js), three.js, Tolgee, Netlify Blobs et Functions, Vite, Unoff UI (thème Yelbolt), Lexend, DM Sans, Spline AR.
+Voir la section [Attributions du README anglais](README.md#attributions) : Spline (runtime et loader, avec howler.js), three.js, Tolgee, Netlify Blobs et Functions, Vite, Unoff UI (thème Yelbolt), Lexend, Spline AR.
 
 « Spline » est une marque de Spline Design Inc. ; « Meta Quest » est une marque de Meta Platforms, Inc. Ce projet est indépendant et **n'est ni affilié, ni approuvé, ni sponsorisé** par Spline ou Meta.
 

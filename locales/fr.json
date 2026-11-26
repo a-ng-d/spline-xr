@@ -3,7 +3,7 @@
     "switch": "Langue"
   },
   "home": {
-    "pageTitle": "SplineXR",
+    "pageTitle": "Spline XR – Exporter ta scène en VR",
     "title": "Explore en <span>VR</span><br>tes scènes Spline",
     "lead": "Colle l'URL d'export de ta scène Spline : tu obtiens un lien à partager, à ouvrir sur ordinateur ou dans un casque Meta Quest.",
     "footer": "Conçu par <a href=\"https://an.gd\" target=\"_blank\" rel=\"noopener\">Aurélien Grimaud</a>, fondateur de <a href=\"https://yelbolt.co\" target=\"_blank\" rel=\"noopener\">Yelbolt</a> · <a href=\"https://github.com/a-ng-d/spline-xr/blob/main/LICENSE\" target=\"_blank\" rel=\"noopener\">Licence MIT</a> · <a href=\"https://github.com/a-ng-d/spline-xr\" target=\"_blank\" rel=\"noopener\">GitHub</a> · Sans lien avec Spline"

@@ -1,6 +1,6 @@
 # Code of Conduct
 
-SplineXR was born in a design school, and many of the people around it are students. We want this project to be a welcoming place to learn, ask questions and share work, whatever your level, background or identity.
+Spline XR was born in a design school, and many of the people around it are students. We want this project to be a welcoming place to learn, ask questions and share work, whatever your level, background or identity.
 
 ## What we expect
 

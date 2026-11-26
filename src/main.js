@@ -27,8 +27,8 @@ const DEBUG = PARAMS.has('debug')
 const WORLD_SCALE = parseFloat(PARAMS.get('scale')) || 0.001
 const EYE_HEIGHT = 1.6        // assumed eye height in local-floor (m)
 const MIN_SCALE = WORLD_SCALE / 20, MAX_SCALE = WORLD_SCALE * 20
-const log  = (...a) => { if (DEBUG) console.log('[SplineXR]', ...a) }
-const warn = (...a) => console.warn('[SplineXR]', ...a)
+const log  = (...a) => { if (DEBUG) console.log('[Spline XR]', ...a) }
+const warn = (...a) => console.warn('[Spline XR]', ...a)
 
 
 // ── DOM ────────────────────────────────────────────────────────────────────────
@@ -1073,7 +1073,7 @@ async function loadScene(scene, { fromRoute = false, save = false, editKey = nul
     if (!fromRoute && location.pathname + location.search !== url) history.pushState(null, '', url)
     // Scene title in the tab (removed from automatic translation while the scene is open)
     const titleEl = document.querySelector('title')
-    if (scene.t) { setText(titleEl, ''); document.title = `${scene.t} — SplineXR` }
+    if (scene.t) { setText(titleEl, ''); document.title = `${scene.t} — Spline XR` }
     else setText(titleEl, 'home.pageTitle')
     setText(loadMsg, 'loading.build')
     teardownEngines()
@@ -1105,7 +1105,7 @@ async function loadScene(scene, { fromRoute = false, save = false, editKey = nul
     showShareBar(scene)
     scheduleThumbnail(scene.id)
   } catch (err) {
-    console.error('[SplineXR]', err)
+    console.error('[Spline XR]', err)
     loadingEl.classList.remove('visible'); configEl.classList.remove('out')
     goBtn.disabled = false
     if (fromRoute) { history.replaceState(null, '', routeUrl('/')); home.editScene(scene) }

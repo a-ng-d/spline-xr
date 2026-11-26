@@ -1,6 +1,6 @@
-# Contributing to SplineXR
+# Contributing to Spline XR
 
-Thank you for wanting to help! SplineXR is a small tool made for design students, so the guiding rule is: **it must stay simple for the people who use it**. No account, no install, no code on their side — a Spline link in, a link to share out.
+Thank you for wanting to help! Spline XR is a small tool made for design students, so the guiding rule is: **it must stay simple for the people who use it**. No account, no install, no code on their side — a Spline link in, a link to share out.
 
 Contributions are welcome in English or French (issues, pull requests, discussions).
 
