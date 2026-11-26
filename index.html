@@ -130,15 +130,19 @@ h1 span { color: var(--color-text-brand-default, var(--accent)) }
   border: 1px solid var(--segmented-control-border-color, var(--border)) }
 .lang-switch button { font: var(--type-weight-600, 600) var(--type-size-01, 11px)/1 var(--font); letter-spacing: .06em; padding: 6px 10px;
   border: 1px solid transparent; border-radius: var(--radius-full, 100px);
-  background: var(--segmented-control-item-background-color-default-default, transparent);
+  background: transparent;   /* inactive tabs: the container's colour */
   color: var(--color-text-secondary-default, var(--muted)); cursor: pointer;
   transition: background var(--duration-small, .12s), color var(--duration-small, .12s) }
-.lang-switch button:hover { background: var(--segmented-control-item-background-color-default-hover, transparent); color: var(--text) }
+.lang-switch button:hover { background: color-mix(in srgb, var(--text) 8%, transparent); color: var(--text) }
 .lang-switch button[aria-pressed="true"] {
   background: var(--segmented-control-item-background-color-active-default, var(--accent));
   border-color: var(--segmented-control-item-border-color-active-default, transparent);
   color: var(--color-text-on-selected-default, var(--text)) }
-#hud .lang-switch { background: color-mix(in srgb, var(--bg) 80%, transparent); backdrop-filter: blur(20px) }
+/* On the scene: same surface as the other scene buttons */
+#hud .lang-switch { align-items: center; padding: 3px;
+  background: color-mix(in srgb, var(--button-secondary-background-color-default, var(--bg)) 88%, transparent);
+  border-color: var(--button-secondary-border-color-default, var(--border)); backdrop-filter: blur(20px) }
+#hud .lang-switch button { min-height: 36px; padding: 0 12px }
 
 /* --- Scene form: Unoff form items + inputs --- */
 .scene-form { display: flex; flex-direction: column; gap: 12px }
