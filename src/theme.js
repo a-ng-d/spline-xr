@@ -4,5 +4,8 @@
 import '@unoff-styles/tokens/modules/commons.css'       // radii, durations, spacing…
 import '@unoff-styles/tokens/modules/yelbolt-colors.css' // palettes (ylb, uno, isb…)
 import '@unoff-styles/tokens/modules/yelbolt-modes.css'  // semantic colours per data-mode
-import '@unoff-styles/tokens/modules/yelbolt-types.css'  // Lexend
 import '@unoff-styles/texts/styles/yelbolt.css'          // text styles
+// Lexend, served with the app (the theme's own stylesheet fetches it from
+// Google Fonts)
+import '@fontsource-variable/lexend'
+import './styles/unoff-yelbolt-components.generated.css'  // button, input, card… tokens

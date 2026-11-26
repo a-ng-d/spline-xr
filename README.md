@@ -151,8 +151,8 @@ SplineXR stands on the work of others. Thank you to them.
 | [Tolgee](https://github.com/tolgee/tolgee-js) (`@tolgee/web`) | Interface translation | BSD-3-Clause |
 | [Netlify Blobs](https://github.com/netlify/blobs) (`@netlify/blobs`) and [`@netlify/functions`](https://github.com/netlify/primitives) | Storage of link preview images, cache purge | MIT |
 | [Vite](https://vitejs.dev) | Build | MIT |
-| [Unoff UI](https://github.com/yelbolt/unoff-ui) (`@unoff/ui`) | Yelbolt design tokens: colours, radii, type | MIT |
-| [Lexend](https://fonts.google.com/specimen/Lexend) via Google Fonts | Typeface (Yelbolt theme) | SIL Open Font License 1.1 |
+| [Unoff UI](https://github.com/yelbolt/unoff-ui) (`@unoff/ui`) | Yelbolt design tokens: colours, radii, type, and component tokens (button, input, card, chip…) | MIT |
+| [Lexend](https://fonts.google.com/specimen/Lexend) via [`@fontsource-variable/lexend`](https://fontsource.org/fonts/lexend) | Typeface (Yelbolt theme), served with the app | SIL Open Font License 1.1 |
 | [DM Sans](https://fonts.google.com/specimen/DM+Sans) | Typeface of the default link-preview images | SIL Open Font License 1.1 |
 | [Spline AR](https://github.com/a-ng-d/spline-ar) | "My creations" principle, `src/i18n.js` | Same author |
 

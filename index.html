@@ -30,125 +30,168 @@
   --muted: var(--color-text-tertiary-default);
   --danger: var(--color-text-danger-default);
   --r: var(--border-radius-xxxlarge, 16px);
-  --font: var(--text-font-family, 'Lexend'), 'Lexend', system-ui, sans-serif;
+  --font: 'Lexend Variable', 'Lexend', system-ui, sans-serif;
 }
+/* The theme names Lexend alone: add the self-hosted file and fallbacks */
+html:root[data-theme=yelbolt] { --text-font-family: 'Lexend Variable', 'Lexend', system-ui, sans-serif }
 * { box-sizing: border-box; margin: 0; padding: 0 }
 html, body { width: 100%; height: 100%; background: var(--bg); overflow: hidden; font-family: var(--font); color: var(--text) }
 
 /* --- Animated background --- */
 #bg-canvas { position: fixed; inset: 0; z-index: 0; pointer-events: none }
 
+/* Components below use Unoff UI's Yelbolt component tokens (button, input,
+   card, chip, segmented control, section title, text styles…), generated in
+   src/styles/ by vite.config.js. Sizes are scaled up where the Quest browser
+   needs bigger targets. */
+
 /* --- Home screen --- */
 #config {
   position: fixed; inset: 0; z-index: 10;
   overflow-y: auto; padding: 32px 16px 60px;
   display: flex; justify-content: center;
-  transition: opacity .5s, transform .5s;
+  transition: opacity var(--duration-xlarge, .4s) var(--easing-standard, ease), transform var(--duration-xlarge, .4s) var(--easing-standard, ease);
 }
-.home { width: 100%; max-width: 560px; margin: auto 0; display: flex; flex-direction: column; gap: 16px }
+.home { width: 100%; max-width: 560px; margin: auto 0; display: flex; flex-direction: column; gap: var(--space-gap-800, 16px) }
 .home .card { max-width: none }
 #config.out { opacity: 0; pointer-events: none; transform: scale(.96) }
 
+/* Card: Unoff card (glass over the animated background) */
 .card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--r);
+  background: color-mix(in srgb, var(--card-background-color-default, var(--bg)) 72%, transparent);
+  border: var(--card-border-width-default, 1px) solid var(--card-border-color-default, var(--border));
+  border-radius: var(--card-radius, var(--r));
   backdrop-filter: blur(24px);
   padding: 28px 28px 24px;
   width: 100%; max-width: 420px;
   display: flex; flex-direction: column; gap: 20px;
+  transition: border-color var(--card-transition, .2s);
 }
+.card:hover { border-color: var(--card-border-color-hover, var(--border)) }
 
 .logo {
-  display: flex; align-items: center; gap: 10px;
-  font-size: 13px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--muted);
+  display: flex; align-items: center; gap: var(--space-gap-400, 10px);
+  font: var(--type-weight-600, 600) var(--type-size-02, 13px)/1 var(--font);
+  letter-spacing: .12em; text-transform: uppercase; color: var(--color-text-brand-default, var(--accent));
 }
 .logo-dot {
-  width: 8px; height: 8px; border-radius: 50%;
+  width: 8px; height: 8px; border-radius: var(--radius-full, 50%);
   background: var(--accent); box-shadow: 0 0 8px var(--accent);
   animation: pulse 2s ease-in-out infinite;
 }
 @keyframes pulse { 0%,100% { opacity:1 } 50% { opacity:.3 } }
 
-h1 { font-size: 22px; font-weight: 700; letter-spacing: -.02em; line-height: 1.2 }
-h1 span { color: var(--accent) }
+h1 { font: var(--type-weight-600, 700) 24px/1.2 var(--font); letter-spacing: -.02em; color: var(--text) }
+h1 span { color: var(--color-text-brand-default, var(--accent)) }
 
+/* Section titles: Unoff SectionTitle */
 .section-label {
-  font-size: 11px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase;
-  color: var(--muted); margin-bottom: 6px;
+  font-family: var(--section-title-text-font-family, var(--font));
+  font-size: var(--section-title-text-font-size, 11px);
+  font-weight: var(--section-title-text-font-weight, 600);
+  letter-spacing: var(--section-title-text-letter-spacing, .1em);
+  line-height: var(--section-title-text-line-height, 1.4);
+  text-transform: uppercase;
+  color: var(--color-text-secondary-default, var(--muted)); margin-bottom: 6px;
 }
 
-.lead { font-size: 13px; color: var(--muted); line-height: 1.5; margin-top: 8px }
-.help { font-size: 12px; color: var(--muted); line-height: 1.5 }
-.home-footer { font-size: 12px; color: var(--muted); text-align: center; padding: 4px 0 8px }
-.home-footer a { color: inherit; text-decoration: underline; text-underline-offset: 2px }
-.home-footer a:hover { color: var(--accent) }
+/* Text styles: Unoff texts (large / default / small) */
+.lead { font: var(--text-large, 400 14px/1.5 var(--font)); color: var(--color-text-secondary-default, var(--muted)); margin-top: 8px }
+.help { font: var(--text-default, 400 12px/1.5 var(--font)); color: var(--color-text-tertiary-default, var(--muted)) }
+.home-footer { font: var(--text-small, 400 12px/1.5 var(--font)); color: var(--color-text-tertiary-default, var(--muted)); text-align: center; padding: 4px 0 8px }
+.home-footer a, .help a { color: var(--color-text-secondary-default, inherit); text-decoration: underline; text-underline-offset: 2px }
+.home-footer a:hover, .help a:hover { color: var(--color-text-brand-default, var(--accent)) }
 .help code { font-family: monospace; color: var(--text) }
-.help b { color: var(--text); font-weight: 600 }
+.help b { color: var(--text); font-weight: var(--type-weight-600, 600) }
 
 .home-top { display: flex; align-items: center; justify-content: space-between; gap: 12px }
 
-/* --- Language switch (from Spline AR) --- */
-.lang-switch { display: inline-flex; padding: 2px; border-radius: 100px; background: var(--surface);
-  border: 1px solid var(--border) }
-.lang-switch button { font: 600 11px/1 var(--font, inherit); letter-spacing: .06em; padding: 5px 9px;
-  border: 0; border-radius: 100px; background: transparent; color: var(--muted); cursor: pointer }
-.lang-switch button:hover { color: var(--text) }
-.lang-switch button[aria-pressed="true"] { background: color-mix(in srgb, var(--accent) 20%, transparent); color: var(--text) }
+/* --- Language switch: Unoff SegmentedControl --- */
+.lang-switch { display: inline-flex; padding: 2px; border-radius: var(--radius-full, 100px);
+  background: var(--segmented-control-background-color, var(--surface));
+  border: 1px solid var(--segmented-control-border-color, var(--border)) }
+.lang-switch button { font: var(--type-weight-600, 600) var(--type-size-01, 11px)/1 var(--font); letter-spacing: .06em; padding: 6px 10px;
+  border: 1px solid transparent; border-radius: var(--radius-full, 100px);
+  background: var(--segmented-control-item-background-color-default-default, transparent);
+  color: var(--color-text-secondary-default, var(--muted)); cursor: pointer;
+  transition: background var(--duration-small, .12s), color var(--duration-small, .12s) }
+.lang-switch button:hover { background: var(--segmented-control-item-background-color-default-hover, transparent); color: var(--text) }
+.lang-switch button[aria-pressed="true"] {
+  background: var(--segmented-control-item-background-color-active-default, var(--accent));
+  border-color: var(--segmented-control-item-border-color-active-default, transparent);
+  color: var(--color-text-on-selected-default, var(--text)) }
 #hud .lang-switch { background: color-mix(in srgb, var(--bg) 80%, transparent); backdrop-filter: blur(20px) }
 
-/* --- Scene form --- */
+/* --- Scene form: Unoff form items + inputs --- */
 .scene-form { display: flex; flex-direction: column; gap: 12px }
 .scene-form .section-label { margin: 0 }
-.field { display: flex; flex-direction: column; gap: 6px }
-.field > span { font-size: 12px; font-weight: 500; color: var(--text) }
-.field em { font-style: normal; color: var(--muted); font-weight: 400 }
+.field { display: flex; flex-direction: column; gap: var(--form-item-gap, 6px) }
+.field > span { font: var(--text-label, 500 12px/1.4 var(--font)); font-weight: var(--type-weight-500, 500); color: var(--text) }
+.field em { font-style: normal; color: var(--color-text-tertiary-default, var(--muted)); font-weight: var(--type-weight-400, 400) }
 input[type=text] {
-  width: 100%; background: color-mix(in srgb, var(--text) 5%, transparent); border: 1px solid var(--border);
-  border-radius: 10px; padding: 10px 14px; color: var(--text); font-size: 13px;
-  outline: none; transition: border-color .15s;
+  width: 100%; min-height: 40px;
+  background: var(--input-background-color-default, var(--surface));
+  border: var(--input-border-width-default, 1px) solid var(--input-border-color-default, var(--border));
+  border-radius: var(--input-radius, 10px); padding: 10px 14px;
+  color: var(--input-text-color-default, var(--text)); font-size: var(--type-size-02, 13px);
+  outline: none; transition: border-color var(--duration-small, .15s), background var(--duration-small, .15s);
   font-family: monospace;
 }
-input[type=text].plain { font-family: var(--font) }
-input[type=text]::placeholder { color: var(--muted) }
-input[type=text]:focus { border-color: var(--accent) }
-input[type=text].error { border-color: var(--danger); animation: shake .3s }
+input[type=text].plain { font-family: var(--input-text-font-family, var(--font)) }
+input[type=text]::placeholder { color: var(--color-text-tertiary-default, var(--muted)); opacity: .8 }
+input[type=text]:hover { background: var(--input-background-color-hover, var(--surface)); border-color: var(--input-border-color-hover, var(--border)) }
+input[type=text]:focus { background: var(--input-background-color-focus, var(--surface)); border-color: var(--input-border-color-focus, var(--accent)) }
+input[type=text].error { border-color: var(--input-border-color-error-default, var(--danger)); animation: shake .3s }
 @keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-4px)} 75%{transform:translateX(4px)} }
 .form-actions { display: flex; gap: 8px }
 .form-actions .btn-primary { flex: 1 }
 
+/* --- Buttons: Unoff Button (primary / secondary / destructive) --- */
 .btn {
-  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
-  border: none; border-radius: 10px; padding: 10px 16px;
-  font: 600 13px var(--font); cursor: pointer; transition: all .15s;
-  white-space: nowrap; text-decoration: none;
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--button-base-gap, 6px);
+  min-height: var(--button-large-height, 40px);
+  border: var(--stroke-width-thin, 1px) solid transparent; border-radius: var(--button-base-radius, 100px);
+  padding: 0 var(--button-large-padding-left, 16px);
+  font-family: var(--button-base-text-font-family, var(--font));
+  font-size: var(--button-large-text-font-size, 13px); font-weight: var(--type-weight-600, 600);
+  cursor: pointer; white-space: nowrap; text-decoration: none;
+  transition: background var(--duration-small, .15s), border-color var(--duration-small, .15s), color var(--duration-small, .15s), transform var(--duration-small, .15s);
 }
-.btn-primary { background: var(--accent); color: var(--on-accent) }
-.btn-primary:hover { background: var(--accent-hover); transform: translateY(-1px) }
-.btn-primary:disabled { opacity: .4; cursor: not-allowed; transform: none }
-.btn-sm { padding: 7px 12px; font-size: 12px }
+.btn-primary { background: var(--button-primary-background-color-default, var(--accent)); color: var(--button-primary-text-color-default, var(--on-accent)) }
+.btn-primary:hover { background: var(--button-primary-background-color-hover, var(--accent-hover)); color: var(--button-primary-text-color-hover, var(--on-accent)); transform: translateY(-1px) }
+.btn-primary:active { background: var(--button-primary-background-color-pressed, var(--accent)); transform: none }
+.btn-primary:disabled { background: var(--button-primary-background-color-disabled, var(--accent)); color: var(--button-primary-text-color-disabled, var(--on-accent)); opacity: .6; cursor: not-allowed; transform: none }
+.btn-sm { min-height: var(--button-base-height, 32px); padding: 0 var(--space-inset-400, 12px); font-size: var(--button-base-text-font-size, 12px) }
 .btn[hidden] { display: none }
-.btn-ghost { background: var(--surface); border: 1px solid var(--border); color: var(--text) }
-.btn-ghost:hover { background: color-mix(in srgb, var(--text) 7%, transparent) }
-.btn-danger { background: color-mix(in srgb, var(--danger) 15%, transparent); border: 1px solid color-mix(in srgb, var(--danger) 25%, transparent); color: var(--danger) }
-.btn-danger:hover { background: color-mix(in srgb, var(--danger) 25%, transparent) }
+.btn-ghost { background: var(--button-secondary-background-color-default, var(--surface)); border-color: var(--button-secondary-border-color-default, var(--border)); color: var(--button-secondary-text-color-default, var(--text)) }
+.btn-ghost:hover { background: var(--button-secondary-background-color-hover, var(--surface)); border-color: var(--button-secondary-border-color-hover, var(--border)) }
+.btn-ghost:active { background: var(--button-secondary-background-color-pressed, var(--surface)) }
+.btn-danger { background: var(--button-destructive-background-color-default, var(--danger)); border-color: var(--button-destructive-border-color-default, transparent); color: var(--button-destructive-text-color-default, var(--text)) }
+.btn-danger:hover { background: var(--button-destructive-background-color-hover, var(--danger)) }
 
-/* --- Lists: Get started / My creations (from Spline AR) --- */
+/* --- Lists: Get started / My creations: Unoff list + simple items --- */
 .list-head { display: flex; align-items: center; justify-content: space-between; gap: 10px }
 .list-head .section-label { margin: 0 }
-.tag { font-size: 10px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--accent2);
-  background: color-mix(in srgb, var(--accent2) 10%, transparent); border: 1px solid color-mix(in srgb, var(--accent2) 25%, transparent); border-radius: 100px; padding: 2px 8px }
-.works { display: flex; flex-direction: column; gap: 8px }
+/* Tag: Unoff Chip */
+.tag { font: var(--type-weight-600, 600) var(--type-size-01, 10px)/1 var(--font); letter-spacing: .08em; text-transform: uppercase;
+  display: inline-flex; align-items: center; min-height: var(--chip-height, 18px); padding: 0 var(--chip-padding-left, 8px);
+  color: var(--chip-text-color-default, var(--on-accent)); background: var(--chip-background-color-default, var(--accent));
+  border-radius: var(--chip-radius, 100px) }
+.works { display: flex; flex-direction: column; gap: var(--space-gap-400, 8px) }
 .work { display: grid; grid-template-columns: 72px 1fr auto; gap: 12px; align-items: center;
-  padding: 10px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface) }
-.work.current { border-color: color-mix(in srgb, var(--accent) 50%, transparent); background: color-mix(in srgb, var(--accent) 8%, transparent) }
-.work-thumb { width: 72px; height: 38px; border-radius: 6px; overflow: hidden; background: color-mix(in srgb, var(--text) 4%, transparent);
-  display: flex; align-items: center; justify-content: center; color: var(--accent); font-size: 16px }
+  padding: 10px; border: var(--stroke-width-thin, 1px) solid var(--border); border-radius: var(--radius-xxlarge, 12px);
+  background: var(--list-background-color, var(--surface));
+  transition: background var(--duration-small, .12s), border-color var(--duration-small, .12s) }
+.work:hover { background: var(--color-background-primary-hover, var(--surface)) }
+.work.current { border-color: var(--color-border-brand-default, var(--accent)); background: var(--color-background-secondary-default, var(--surface)) }
+/* Thumbnail: Unoff Thumbnail */
+.work-thumb { width: 72px; height: 38px; border-radius: var(--thumbnail-radius, 6px); overflow: hidden;
+  background: var(--thumbnail-background-color, var(--surface)); border: var(--thumbnail-border-width, 0) solid var(--thumbnail-border-color, transparent);
+  display: flex; align-items: center; justify-content: center; color: var(--color-icon-brand-default, var(--accent)); font-size: 16px }
 .work-thumb img { width: 100%; height: 100%; object-fit: cover }
 .work-info { min-width: 0 }
-.work-title { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
-.work-meta { font-size: 11px; color: var(--muted); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
-.work-meta { font-family: var(--font) }
+.work-title { font: var(--text-default, 600 13px/1.4 var(--font)); font-weight: var(--type-weight-600, 600); color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
+.work-meta { font: var(--text-small, 400 11px/1.4 var(--font)); color: var(--color-text-tertiary-default, var(--muted)); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
 .work-actions { display: flex; gap: 6px }
 .work-actions .is-current { pointer-events: none; opacity: .5 }
 .works-empty { padding: 4px 2px }
@@ -167,13 +210,13 @@ input[type=text].error { border-color: var(--danger); animation: shake .3s }
 .spinner {
   width: 40px; height: 40px; border-radius: 50%;
   border: 2px solid var(--border);
-  border-top-color: var(--accent); border-right-color: var(--accent2);
+  border-top-color: var(--accent); border-right-color: var(--color-background-brand-strong, var(--accent2));
   animation: spin .8s linear infinite;
 }
 @keyframes spin { to { transform: rotate(360deg) } }
-#load-msg { font-size: 13px; color: var(--muted) }
+#load-msg { font: var(--text-default, 400 13px/1.5 var(--font)); color: var(--color-text-secondary-default, var(--muted)) }
 
-/* --- HUD --- */
+/* --- HUD: pill buttons on the scene (Unoff Bar + Buttons) --- */
 #hud {
   position: fixed; bottom: 28px; left: 0; right: 0; z-index: 20;
   display: none; justify-content: center; gap: 12px; padding: 0 16px;
@@ -183,67 +226,74 @@ input[type=text].error { border-color: var(--danger); animation: shake .3s }
 .scene-footer {
   position: fixed; bottom: 6px; left: 50%; transform: translateX(-50%); z-index: 20;
   display: none; width: max-content; max-width: calc(100% - 32px); text-align: center;
-  font-size: 11px; color: color-mix(in srgb, var(--text) 72%, transparent); padding: 3px 12px; border-radius: 100px;
-  background: color-mix(in srgb, var(--bg) 80%, transparent); backdrop-filter: blur(12px);
+  font: var(--text-small, 400 11px/1.5 var(--font)); color: var(--color-text-secondary-default, var(--text)); padding: 3px 12px; border-radius: var(--radius-full, 100px);
+  background: color-mix(in srgb, var(--bg) 85%, transparent); backdrop-filter: blur(12px);
 }
 #hud.visible ~ .scene-footer { display: block }
 .scene-footer a { color: inherit; text-decoration: underline; text-underline-offset: 2px }
-.scene-footer a:hover { color: var(--accent) }
+.scene-footer a:hover { color: var(--color-text-brand-default, var(--accent)) }
 .hud-btn {
-  display: flex; align-items: center; gap: 8px;
-  background: color-mix(in srgb, var(--bg) 80%, transparent); border: 1px solid var(--border);
-  backdrop-filter: blur(20px); border-radius: 100px;
-  padding: 12px 22px; font-size: 13px; font-weight: 600;
-  color: var(--text); cursor: pointer;
-  transition: all .2s;
+  display: flex; align-items: center; gap: 8px; min-height: 44px;
+  background: color-mix(in srgb, var(--button-secondary-background-color-default, var(--bg)) 88%, transparent);
+  border: var(--stroke-width-thin, 1px) solid var(--button-secondary-border-color-default, var(--border));
+  backdrop-filter: blur(20px); border-radius: var(--button-base-radius, 100px);
+  padding: 0 22px; font: var(--type-weight-600, 600) var(--button-large-text-font-size, 13px)/1 var(--button-base-text-font-family, var(--font));
+  color: var(--button-secondary-text-color-default, var(--text)); cursor: pointer;
+  transition: all var(--duration-medium, .2s);
 }
-.hud-btn:hover { border-color: var(--accent); color: var(--accent) }
-.hud-btn:disabled { opacity: .4; cursor: not-allowed }
-#btn-reset { background: color-mix(in srgb, var(--accent2) 10%, transparent); border-color: color-mix(in srgb, var(--accent2) 30%, transparent); color: var(--accent2) }
-#btn-reset:hover { background: color-mix(in srgb, var(--accent2) 20%, transparent) }
-#btn-vr { background: color-mix(in srgb, var(--accent) 15%, transparent); border-color: color-mix(in srgb, var(--accent) 40%, transparent); color: var(--accent) }
-#btn-vr:hover:not(:disabled) { background: color-mix(in srgb, var(--accent) 30%, transparent) }
+.hud-btn:hover { background: var(--button-secondary-background-color-hover, var(--bg)); border-color: var(--button-secondary-border-color-hover, var(--accent)) }
+.hud-btn:disabled { opacity: .5; cursor: not-allowed }
+#btn-reset { color: var(--color-text-success-default, var(--accent2)) }
+#btn-vr { background: var(--button-primary-background-color-default, var(--accent)); border-color: transparent; color: var(--button-primary-text-color-default, var(--on-accent)) }
+#btn-vr:hover:not(:disabled) { background: var(--button-primary-background-color-hover, var(--accent)) }
+#btn-vr:disabled { background: color-mix(in srgb, var(--button-secondary-background-color-default, var(--bg)) 88%, transparent); border-color: var(--button-secondary-border-color-default, var(--border)); color: var(--color-text-secondary-default, var(--muted)); opacity: 1 }
 
-/* --- Shareable link --- */
+/* --- Shareable link: Unoff Bar --- */
 #share-bar {
   position: fixed; top: 16px; left: 50%; transform: translateX(-50%); z-index: 20;
   display: none; align-items: center; gap: 10px;
   max-width: calc(100% - 32px);
-  background: color-mix(in srgb, var(--bg) 80%, transparent); border: 1px solid var(--border);
-  backdrop-filter: blur(20px); border-radius: 100px;
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  border: var(--bar-border-width, 1px) solid var(--bar-border-color, var(--border));
+  backdrop-filter: blur(20px); border-radius: var(--radius-full, 100px);
   padding: 6px 6px 6px 18px;
 }
 #share-bar.visible { display: flex }
-#share-label { font-size: 11px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px; flex-shrink: 0 }
-#share-source { flex-shrink: 0; font-size: 12px; font-weight: 600; color: var(--muted); text-decoration: none; padding: 0 4px; white-space: nowrap }
-#share-source:hover { color: var(--accent2) }
+#share-label { font: var(--type-weight-600, 600) var(--type-size-01, 11px)/1 var(--font); letter-spacing: .1em; text-transform: uppercase; color: var(--color-text-brand-default, var(--muted)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px; flex-shrink: 0 }
+#share-source { flex-shrink: 0; font: var(--type-weight-600, 600) var(--type-size-02, 12px)/1 var(--font); color: var(--color-text-secondary-default, var(--muted)); text-decoration: none; padding: 0 4px; white-space: nowrap }
+#share-source:hover { color: var(--color-text-brand-default, var(--accent)) }
 #share-source[hidden] { display: none }
 #share-url {
-  font-family: monospace; font-size: 13px; color: var(--text);
+  font-family: monospace; font-size: var(--type-size-02, 13px); color: var(--text);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; user-select: all;
   text-decoration: none; min-width: 0;
 }
-#share-url:hover { color: var(--accent) }
+#share-url:hover { color: var(--color-text-brand-default, var(--accent)) }
 #share-copy {
-  flex-shrink: 0; border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent); background: color-mix(in srgb, var(--accent) 15%, transparent);
-  color: var(--accent); border-radius: 100px; padding: 8px 16px;
-  font-size: 13px; font-weight: 600; cursor: pointer; font-family: var(--font); transition: all .2s;
+  flex-shrink: 0; min-height: 36px; border: 0;
+  background: var(--button-primary-background-color-default, var(--accent)); color: var(--button-primary-text-color-default, var(--on-accent));
+  border-radius: var(--button-base-radius, 100px); padding: 0 16px;
+  font: var(--type-weight-600, 600) var(--button-large-text-font-size, 13px)/1 var(--button-base-text-font-family, var(--font)); cursor: pointer; transition: all var(--duration-medium, .2s);
 }
-#share-copy:hover { background: color-mix(in srgb, var(--accent) 30%, transparent) }
+#share-copy:hover { background: var(--button-primary-background-color-hover, var(--accent)) }
 #share-thumb {
-  flex-shrink: 0; border: 1px solid var(--border); background: var(--surface); color: var(--text);
-  border-radius: 100px; width: 38px; height: 36px; font-size: 14px; cursor: pointer; transition: all .2s;
+  flex-shrink: 0; border: var(--stroke-width-thin, 1px) solid var(--button-secondary-border-color-default, var(--border));
+  background: var(--button-secondary-background-color-default, var(--surface)); color: var(--text);
+  border-radius: var(--icon-button-base-radius, 100px); width: 38px; height: 36px; font-size: 14px; cursor: pointer; transition: all var(--duration-medium, .2s);
 }
-#share-thumb:hover:not(:disabled) { border-color: var(--accent) }
+#share-thumb:hover:not(:disabled) { background: var(--button-secondary-background-color-hover, var(--surface)) }
 #share-thumb:disabled { opacity: .6; cursor: default }
-#share-copy.done { border-color: color-mix(in srgb, var(--accent2) 40%, transparent); background: color-mix(in srgb, var(--accent2) 15%, transparent); color: var(--accent2) }
+#share-copy.done { background: var(--color-background-success-default, var(--accent2)); color: var(--color-text-on-success-default, var(--bg)) }
 @media (max-width: 560px) { #share-label { display: none } }
 
-/* --- Error --- */
+/* --- Error: Unoff SemanticMessage (error) --- */
 #err-bar {
   position: fixed; top: 16px; left: 50%; transform: translateX(-50%) translateY(-80px);
-  z-index: 30; background: color-mix(in srgb, var(--danger) 90%, transparent); border-radius: 10px;
-  padding: 10px 18px; font-size: 13px; font-weight: 500;
+  z-index: 30; background: var(--color-background-danger-default, var(--danger));
+  color: var(--color-text-on-danger-default, var(--text));
+  border: var(--stroke-width-thin, 1px) solid var(--color-border-danger-default, transparent);
+  border-radius: var(--semantic-message-radius, 10px);
+  padding: 10px 18px; font: var(--type-weight-500, 500) var(--type-size-02, 13px)/1.4 var(--font);
   transition: transform .3s; max-width: 360px; text-align: center;
 }
 #err-bar.visible { transform: translateX(-50%) translateY(0) }

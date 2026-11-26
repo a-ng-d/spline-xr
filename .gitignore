@@ -4,3 +4,4 @@ dist/
 *.log
 .env
 .netlify/
+src/styles/*.generated.css
