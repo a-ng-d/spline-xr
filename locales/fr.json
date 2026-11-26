@@ -73,7 +73,7 @@
     "thumbTitle": "Utiliser la vue actuelle comme aperçu du lien",
     "thumbDone": "Aperçu mis à jour",
     "thumbFailed": "Échec : réessaie hors VR, une fois le site en ligne",
-    "thumb": "Aperçu"
+    "thumb": "Capturer la vignette"
   },
   "errors": {
     "invalidLink": "Lien de scène invalide",

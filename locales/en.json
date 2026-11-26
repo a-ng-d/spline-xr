@@ -73,7 +73,7 @@
     "thumbTitle": "Use the current view as the link preview",
     "thumbDone": "Preview updated",
     "thumbFailed": "Failed: try again outside VR, once the site is online",
-    "thumb": "Preview"
+    "thumb": "Capture thumbnail"
   },
   "errors": {
     "invalidLink": "Invalid scene link",
