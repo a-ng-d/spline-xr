@@ -1,3 +1,4 @@
+import './theme.js'
 import {
   WebGLRenderer, PerspectiveCamera, Scene, AmbientLight, DirectionalLight,
   Color, Clock, Vector3, Group, Raycaster, Box3,
@@ -66,7 +67,7 @@ function debugLog(msg) { if (!DEBUG) return; debugEl.style.display = 'block'; de
   let t = 0
   const orbs = Array.from({ length: 4 }, (_, i) => ({
     x: 0.2 + i * 0.2, y: 0.3 + (i % 2) * 0.4,
-    r: 180 + i * 60, hue: [250, 190, 280, 160][i],
+    r: 180 + i * 60, hue: [57, 45, 64, 38][i],   // Yelbolt yellows
     speed: 0.0003 + i * 0.0001, phase: i * 1.3
   }))
   ;(function drawBg() {
@@ -76,8 +77,8 @@ function debugLog(msg) { if (!DEBUG) return; debugEl.style.display = 'block'; de
       const cx = (o.x + Math.sin(t * o.speed + o.phase) * 0.08) * bgCanvas.width
       const cy = (o.y + Math.cos(t * o.speed * 0.7 + o.phase) * 0.06) * bgCanvas.height
       const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, o.r)
-      g.addColorStop(0, `hsla(${o.hue},70%,55%,0.12)`)
-      g.addColorStop(1, `hsla(${o.hue},70%,55%,0)`)
+      g.addColorStop(0, `hsla(${o.hue},90%,55%,0.10)`)
+      g.addColorStop(1, `hsla(${o.hue},90%,55%,0)`)
       ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, cy, o.r, 0, Math.PI * 2); ctx.fill()
     })
     requestAnimationFrame(drawBg)
@@ -879,8 +880,8 @@ function detachXR(scene) {
 
 // ── Out-of-bounds ────────────────────────────────────────────────────────────
 const oobOverlay = document.createElement('div')
-oobOverlay.style.cssText = 'position:fixed;inset:0;z-index:25;display:none;align-items:center;justify-content:center;background:rgba(6,6,15,.75);backdrop-filter:blur(8px);flex-direction:column;gap:14px;'
-oobOverlay.innerHTML = `<div style="font-size:28px">🧭</div><div style="font-size:16px;font-weight:600;color:#e8e8f0" data-i18n="oob.title"></div><div style="font-size:13px;color:#7a7a95" data-i18n="oob.auto"></div><button id="oob-reset-btn" style="margin-top:4px;padding:10px 22px;border-radius:100px;border:1px solid rgba(123,110,246,.5);background:rgba(123,110,246,.2);color:#7b6ef6;font-size:13px;font-weight:600;cursor:pointer;" data-i18n="oob.back"></button>`
+oobOverlay.style.cssText = 'position:fixed;inset:0;z-index:25;display:none;align-items:center;justify-content:center;background:color-mix(in srgb, var(--bg) 75%, transparent);backdrop-filter:blur(8px);flex-direction:column;gap:14px;'
+oobOverlay.innerHTML = `<div style="font-size:28px">🧭</div><div style="font-size:16px;font-weight:600;color:var(--text)" data-i18n="oob.title"></div><div style="font-size:13px;color:var(--muted)" data-i18n="oob.auto"></div><button id="oob-reset-btn" style="margin-top:4px;padding:10px 22px;border-radius:100px;border:1px solid color-mix(in srgb, var(--accent) 50%, transparent);background:color-mix(in srgb, var(--accent) 20%, transparent);color:var(--accent);font-size:13px;font-weight:600;cursor:pointer;" data-i18n="oob.back"></button>`
 translateDom(oobOverlay)
 document.body.appendChild(oobOverlay)
 document.getElementById('oob-reset-btn').onclick = () => resetCamera()

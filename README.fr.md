@@ -142,7 +142,7 @@ Déploiement : un site Netlify relié au dépôt, build `npm run build`, dossier
 
 ## Attributions
 
-Voir la section [Attributions du README anglais](README.md#attributions) : Spline (runtime et loader, avec howler.js), three.js, Tolgee, Netlify Blobs et Functions, Vite, DM Sans, Spline AR.
+Voir la section [Attributions du README anglais](README.md#attributions) : Spline (runtime et loader, avec howler.js), three.js, Tolgee, Netlify Blobs et Functions, Vite, Unoff UI (thème Yelbolt), Lexend, DM Sans, Spline AR.
 
 « Spline » est une marque de Spline Design Inc. ; « Meta Quest » est une marque de Meta Platforms, Inc. Ce projet est indépendant et **n'est ni affilié, ni approuvé, ni sponsorisé** par Spline ou Meta.
 
