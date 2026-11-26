@@ -1,18 +1,25 @@
-// Preview tags (Open Graph / Twitter) for each /s/<id> link, in English or French
-// depending on Accept-Language. Social networks do not run the page's JavaScript,
-// so the HTML tags are rewritten before it is sent.
+// Preview tags (Open Graph / Twitter) in English or French depending on
+// Accept-Language: for each /s/<id> link (scene title and thumbnail) and for the home
+// page (default image, title, description). Social networks and messaging apps do
+// not run the page's JavaScript, so the HTML tags are rewritten before it is sent.
 const ID_RE = /^[A-Za-z0-9_-]{6,64}$/
 
 const STRINGS = {
   en: {
-    title: 'Spline scene in VR — Spline XR',
-    titled: t => `${t} — Spline XR`,
+    title: 'Spline scene in VR – Spline XR',
+    titled: t => `${t} – Spline XR`,
     description: 'Explore this 3D scene in the browser or in VR on a Meta Quest headset.',
+    homeTitle: 'Spline XR – Export your scene to VR',
+    homeDescription: 'Explore Spline 3D scenes in the browser or in VR on a Meta Quest headset.',
+    homeImage: '/og-default.jpg',
   },
   fr: {
-    title: 'Scène Spline en VR — Spline XR',
-    titled: t => `${t} — Spline XR`,
+    title: 'Scène Spline en VR – Spline XR',
+    titled: t => `${t} – Spline XR`,
     description: 'Explore cette scène 3D dans le navigateur ou en VR sur un casque Meta Quest.',
+    homeTitle: 'Spline XR – Exporter ta scène en VR',
+    homeDescription: 'Explore tes scènes 3D Spline dans le navigateur ou en VR sur un casque Meta Quest.',
+    homeImage: '/og-default-fr.jpg',
   },
 }
 
@@ -51,19 +58,44 @@ export function rewriteMeta(html, { origin, id, search = '', lang = 'en' }) {
   return out
 }
 
+// Home page: default preview image, title and description in the language
+export function rewriteHome(html, { origin, lang = 'en' }) {
+  const s = STRINGS[lang] ?? STRINGS.en
+  const image = origin + s.homeImage
+  const values = {
+    'description': s.homeDescription,
+    'og:title': s.homeTitle,
+    'og:description': s.homeDescription,
+    'og:image': image,
+    'og:locale': lang === 'fr' ? 'fr_FR' : 'en_US',
+    'twitter:image': image,
+  }
+  let out = html.replace(/(<title[^>]*>)[^<]*(<\/title>)/, `$1${escapeAttr(s.homeTitle)}$2`)
+  for (const [key, value] of Object.entries(values)) {
+    const attr = key.startsWith('og:') ? 'property' : 'name'
+    const re = new RegExp(`(<meta ${attr}="${key}" content=")[^"]*(")`)
+    out = re.test(out) ? out.replace(re, `$1${escapeAttr(value)}$2`)
+      : out.replace(/(<\/title>)/, `$1\n<meta ${attr}="${key}" content="${escapeAttr(value)}">`)
+  }
+  return out
+}
+
 export default async (request, context) => {
   const url = new URL(request.url)
   const id = url.pathname.match(/^\/s\/([^/]+)\/?$/)?.[1]
+  const isHome = url.pathname === '/' || url.pathname === '/index.html'
   const response = await context.next()
-  if (!id || !ID_RE.test(id)) return response
+  if (!isHome && (!id || !ID_RE.test(id))) return response
   if (!(response.headers.get('content-type') ?? '').includes('text/html')) return response
 
   const lang = pickLanguage(request.headers.get('accept-language'))
-  const html = rewriteMeta(await response.text(), { origin: url.origin, id, search: url.search, lang })
+  const body = await response.text()
+  const html = isHome ? rewriteHome(body, { origin: url.origin, lang })
+    : rewriteMeta(body, { origin: url.origin, id, search: url.search, lang })
   const headers = new Headers(response.headers)
   headers.delete('content-length')
   headers.append('vary', 'Accept-Language')
   return new Response(html, { status: response.status, headers })
 }
 
-export const config = { path: '/s/*' }
+export const config = { path: ['/', '/index.html', '/s/*'] }
