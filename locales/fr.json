@@ -17,8 +17,8 @@
     "titlePlaceholder": "Ma scène",
     "file": "Fichier Spline",
     "fileOptional": "facultatif, pour montrer la scène d'origine",
-    "play": "Jouer la scène →",
-    "saveAndPlay": "Enregistrer et jouer →",
+    "play": "Jouer la scène",
+    "saveAndPlay": "Enregistrer et jouer",
     "cancel": "Annuler",
     "help": "Dans Spline : <b>Export → Code</b>, puis copie l'URL <code>prod.spline.design</code>."
   },
@@ -38,7 +38,7 @@
     "confirmDelete": "Supprimer « {name} » de tes créations ?\nLe lien partagé continuera de marcher."
   },
   "actions": {
-    "play": "▶ Jouer",
+    "play": "Jouer",
     "edit": "Modifier",
     "sourceTitle": "Voir la scène d'origine dans Spline"
   },
@@ -54,25 +54,26 @@
     "build": "Construction de la scène…"
   },
   "hud": {
-    "home": "← Accueil",
-    "reset": "⌂ Recentrer",
-    "edit": "✎ Modifier",
-    "enterVr": "🥽 Entrer en VR",
-    "exitVr": "⏹ Quitter la VR",
-    "noWebxr": "🥽 WebXR non pris en charge",
-    "noHeadset": "🥽 Casque non détecté",
+    "home": "Accueil",
+    "reset": "Recentrer",
+    "edit": "Modifier",
+    "enterVr": "Entrer en VR",
+    "exitVr": "Quitter la VR",
+    "noWebxr": "WebXR non pris en charge",
+    "noHeadset": "Casque non détecté",
     "noHeadsetTitle": "Ouvre depuis le navigateur du Meta Quest",
-    "preview": "🖱 Aperçu Spline · pas de casque",
+    "preview": "Aperçu Spline · sans casque",
     "previewTitle": "Ouvre ce lien dans le navigateur du Meta Quest pour la VR"
   },
   "share": {
     "label": "Lien de la scène",
     "copy": "Copier",
-    "copied": "✓ Copié",
+    "copied": "Copié",
     "copyManual": "Ctrl+C",
     "thumbTitle": "Utiliser la vue actuelle comme aperçu du lien",
     "thumbDone": "Aperçu mis à jour",
-    "thumbFailed": "Échec : réessaie hors VR, une fois le site en ligne"
+    "thumbFailed": "Échec : réessaie hors VR, une fois le site en ligne",
+    "thumb": "Aperçu"
   },
   "errors": {
     "invalidLink": "Lien de scène invalide",

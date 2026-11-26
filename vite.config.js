@@ -11,6 +11,8 @@ const UNOFF = fileURLToPath(new URL('./node_modules/@unoff/ui/dist/assets', impo
 const COMPONENTS = ['Button', 'Input', 'card', 'Chip', 'SegmentedControl', 'SemanticMessage',
   'SectionTitle', 'Section', 'Thumbnail', 'Tooltip', 'Message', 'form-item', 'list', 'SimpleItem', 'Bar',
   'styles/texts/texts']
+// Yelbolt icons used by the app (see [data-icon] in index.html)
+const ICONS = ['back', 'adjust', 'reset', 'visible', 'image', 'copy', 'check', 'play', 'forward', 'resize-to-fit', 'close']
 function unoffComponentTokens() {
   const out = fileURLToPath(new URL('./src/styles/unoff-yelbolt-components.generated.css', import.meta.url))
   const generate = () => {
@@ -21,6 +23,13 @@ function unoffComponentTokens() {
       // custom properties only
       for (const b of blocks) if (/^[^{]*\{\s*--/.test(b)) css += `/* ${name} */\n${b}\n`
     }
+    // Icons: the Yelbolt set holds data-URL SVGs as custom properties; keep
+    // the ones the app uses (the whole set weighs ~40 KB)
+    const icons = readFileSync(`${UNOFF}/styles/icons/icons.css`, 'utf8')
+    const start = icons.indexOf(':root[data-theme=yelbolt]{')
+    const block = icons.slice(start, icons.indexOf(':root[data-theme=', start + 1) >>> 0)   // (data URLs may contain '}')
+    const used = ICONS.map(n => block.match(new RegExp(`--icon-${n}: url\\("[^"]*"\\)`))?.[0]).filter(Boolean)
+    css += `/* icons */\n:root[data-theme=yelbolt]{${used.join(';')}}\n`
     mkdirSync(fileURLToPath(new URL('./src/styles', import.meta.url)), { recursive: true })
     writeFileSync(out, css)
   }

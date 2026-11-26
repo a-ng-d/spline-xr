@@ -1144,7 +1144,7 @@ btnBack.onclick = goHome
 // "Edit": back to the home page with the scene in the form; when it was opened
 // from a link, saving it adds it to My creations.
 const btnEdit = document.createElement('button')
-btnEdit.className = 'hud-btn'; btnEdit.id = 'btn-edit'; setText(btnEdit, 'hud.edit')
+btnEdit.className = 'hud-btn'; btnEdit.id = 'btn-edit'; btnEdit.dataset.icon = 'adjust'; setText(btnEdit, 'hud.edit')
 btnBack.after(btnEdit)
 btnEdit.onclick = () => { const s = currentScene; goHome(); if (s) home.editScene(s) }
 
@@ -1226,11 +1226,11 @@ const shareCopy = document.getElementById('share-copy')
 const shareThumb = document.getElementById('share-thumb')
 shareThumb.onclick = async () => {
   if (!currentScene || shareThumb.disabled) return
-  shareThumb.disabled = true; shareThumb.textContent = '…'
+  shareThumb.disabled = true; shareThumb.dataset.state = 'busy'
   const ok = await requestThumbnail(currentScene.id)
-  shareThumb.textContent = ok ? '✓' : '✕'
+  shareThumb.dataset.state = ok ? 'done' : 'failed'
   setTitleKey(shareThumb, ok ? 'share.thumbDone' : 'share.thumbFailed')
-  setTimeout(() => { shareThumb.textContent = '📷'; setTitleKey(shareThumb, 'share.thumbTitle'); shareThumb.disabled = false }, 2500)
+  setTimeout(() => { delete shareThumb.dataset.state; setTitleKey(shareThumb, 'share.thumbTitle'); shareThumb.disabled = false }, 2500)
 }
 
 const shareLabel  = document.getElementById('share-label')

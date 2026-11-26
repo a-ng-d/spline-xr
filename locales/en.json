@@ -17,8 +17,8 @@
     "titlePlaceholder": "My scene",
     "file": "Spline file",
     "fileOptional": "optional, to show the original scene",
-    "play": "Play the scene →",
-    "saveAndPlay": "Save and play →",
+    "play": "Play the scene",
+    "saveAndPlay": "Save and play",
     "cancel": "Cancel",
     "help": "In Spline: <b>Export → Code</b>, then copy the <code>prod.spline.design</code> URL."
   },
@@ -38,7 +38,7 @@
     "confirmDelete": "Remove “{name}” from your creations?\nThe shared link will keep working."
   },
   "actions": {
-    "play": "▶ Play",
+    "play": "Play",
     "edit": "Edit",
     "sourceTitle": "See the original scene in Spline"
   },
@@ -54,25 +54,26 @@
     "build": "Building the scene…"
   },
   "hud": {
-    "home": "← Home",
-    "reset": "⌂ Reset position",
-    "edit": "✎ Edit",
-    "enterVr": "🥽 Enter VR",
-    "exitVr": "⏹ Exit VR",
-    "noWebxr": "🥽 WebXR not supported",
-    "noHeadset": "🥽 Headset not detected",
+    "home": "Home",
+    "reset": "Reset position",
+    "edit": "Edit",
+    "enterVr": "Enter VR",
+    "exitVr": "Exit VR",
+    "noWebxr": "WebXR not supported",
+    "noHeadset": "Headset not detected",
     "noHeadsetTitle": "Open from the Meta Quest Browser",
-    "preview": "🖱 Spline preview · no headset",
+    "preview": "Spline preview · no headset",
     "previewTitle": "Open this link in the Meta Quest browser for VR"
   },
   "share": {
     "label": "Scene link",
     "copy": "Copy",
-    "copied": "✓ Copied",
+    "copied": "Copied",
     "copyManual": "Ctrl+C",
     "thumbTitle": "Use the current view as the link preview",
     "thumbDone": "Preview updated",
-    "thumbFailed": "Failed: try again outside VR, once the site is online"
+    "thumbFailed": "Failed: try again outside VR, once the site is online",
+    "thumb": "Preview"
   },
   "errors": {
     "invalidLink": "Invalid scene link",

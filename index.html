@@ -45,6 +45,24 @@ html, body { width: 100%; height: 100%; background: var(--bg); overflow: hidden;
    src/styles/ by vite.config.js. Sizes are scaled up where the Quest browser
    needs bigger targets. */
 
+/* --- Icons: Yelbolt set from Unoff UI (masks, so they take the text colour) --- */
+[data-icon]::before, [data-icon-after]::after {
+  content: ''; flex: none; width: 1.25em; height: 1.25em; background: currentColor;
+  -webkit-mask: var(--ic) center / contain no-repeat; mask: var(--ic) center / contain no-repeat;
+}
+[data-icon=back]::before { --ic: var(--icon-back) }
+[data-icon=adjust]::before { --ic: var(--icon-adjust) }
+[data-icon=reset]::before { --ic: var(--icon-reset) }
+[data-icon=visible]::before { --ic: var(--icon-visible) }
+[data-icon=image]::before { --ic: var(--icon-image) }
+[data-icon=copy]::before { --ic: var(--icon-copy) }
+[data-icon=play]::before { --ic: var(--icon-play) }
+[data-icon-after=forward]::after { --ic: var(--icon-forward) }
+[data-icon-after=resize-to-fit]::after { --ic: var(--icon-resize-to-fit) }
+.done[data-icon]::before, [data-state=done][data-icon]::before { --ic: var(--icon-check) }
+[data-state=failed][data-icon]::before { --ic: var(--icon-close) }
+[data-state=busy][data-icon]::before { animation: pulse 1s ease-in-out infinite }
+
 /* --- Home screen --- */
 #config {
   position: fixed; inset: 0; z-index: 10;
@@ -217,23 +235,25 @@ input[type=text].error { border-color: var(--input-border-color-error-default, v
 #load-msg { font: var(--text-default, 400 13px/1.5 var(--font)); color: var(--color-text-secondary-default, var(--muted)) }
 
 /* --- HUD: pill buttons on the scene (Unoff Bar + Buttons) --- */
-#hud {
-  position: fixed; bottom: 28px; left: 0; right: 0; z-index: 20;
-  display: none; justify-content: center; gap: 12px; padding: 0 16px;
+#scene-bottom {
+  position: fixed; bottom: 12px; left: 0; right: 0; z-index: 20;
+  display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 0 12px;
+  pointer-events: none;
 }
+#scene-bottom > * { pointer-events: auto }
+#hud { display: none; flex-wrap: wrap; justify-content: center; gap: 10px }
 #hud.visible { display: flex }
 /* Signature under the scene's buttons */
 .scene-footer {
-  position: fixed; bottom: 6px; left: 50%; transform: translateX(-50%); z-index: 20;
-  display: none; width: max-content; max-width: calc(100% - 32px); text-align: center;
+  display: none; max-width: 100%; text-align: center;
   font: var(--text-small, 400 11px/1.5 var(--font)); color: var(--color-text-secondary-default, var(--text)); padding: 3px 12px; border-radius: var(--radius-full, 100px);
   background: color-mix(in srgb, var(--bg) 85%, transparent); backdrop-filter: blur(12px);
 }
-#hud.visible ~ .scene-footer { display: block }
+#hud.visible + .scene-footer { display: block }
 .scene-footer a { color: inherit; text-decoration: underline; text-underline-offset: 2px }
 .scene-footer a:hover { color: var(--color-text-brand-default, var(--accent)) }
 .hud-btn {
-  display: flex; align-items: center; gap: 8px; min-height: 44px;
+  display: flex; align-items: center; gap: 8px; min-height: 44px; white-space: nowrap;
   background: color-mix(in srgb, var(--button-secondary-background-color-default, var(--bg)) 88%, transparent);
   border: var(--stroke-width-thin, 1px) solid var(--button-secondary-border-color-default, var(--border));
   backdrop-filter: blur(20px); border-radius: var(--button-base-radius, 100px);
@@ -260,7 +280,7 @@ input[type=text].error { border-color: var(--input-border-color-error-default, v
 }
 #share-bar.visible { display: flex }
 #share-label { font: var(--type-weight-600, 600) var(--type-size-01, 11px)/1 var(--font); letter-spacing: .1em; text-transform: uppercase; color: var(--color-text-brand-default, var(--muted)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px; flex-shrink: 0 }
-#share-source { flex-shrink: 0; font: var(--type-weight-600, 600) var(--type-size-02, 12px)/1 var(--font); color: var(--color-text-secondary-default, var(--muted)); text-decoration: none; padding: 0 4px; white-space: nowrap }
+#share-source { flex-shrink: 0; display: inline-flex; align-items: center; gap: 4px; font: var(--type-weight-600, 600) var(--type-size-02, 12px)/1 var(--font); color: var(--color-text-secondary-default, var(--muted)); text-decoration: none; padding: 0 4px; white-space: nowrap }
 #share-source:hover { color: var(--color-text-brand-default, var(--accent)) }
 #share-source[hidden] { display: none }
 #share-url {
@@ -270,7 +290,7 @@ input[type=text].error { border-color: var(--input-border-color-error-default, v
 }
 #share-url:hover { color: var(--color-text-brand-default, var(--accent)) }
 #share-copy {
-  flex-shrink: 0; min-height: 36px; border: 0;
+  flex-shrink: 0; min-height: 36px; border: 0; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
   background: var(--button-primary-background-color-default, var(--accent)); color: var(--button-primary-text-color-default, var(--on-accent));
   border-radius: var(--button-base-radius, 100px); padding: 0 16px;
   font: var(--type-weight-600, 600) var(--button-large-text-font-size, 13px)/1 var(--button-base-text-font-family, var(--font)); cursor: pointer; transition: all var(--duration-medium, .2s);
@@ -279,12 +299,23 @@ input[type=text].error { border-color: var(--input-border-color-error-default, v
 #share-thumb {
   flex-shrink: 0; border: var(--stroke-width-thin, 1px) solid var(--button-secondary-border-color-default, var(--border));
   background: var(--button-secondary-background-color-default, var(--surface)); color: var(--text);
-  border-radius: var(--icon-button-base-radius, 100px); width: 38px; height: 36px; font-size: 14px; cursor: pointer; transition: all var(--duration-medium, .2s);
+  border-radius: var(--button-base-radius, 100px); min-height: 36px; padding: 0 14px;
+  display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
+  font: var(--type-weight-600, 600) var(--button-large-text-font-size, 13px)/1 var(--button-base-text-font-family, var(--font));
+  cursor: pointer; transition: all var(--duration-medium, .2s);
 }
 #share-thumb:hover:not(:disabled) { background: var(--button-secondary-background-color-hover, var(--surface)) }
 #share-thumb:disabled { opacity: .6; cursor: default }
 #share-copy.done { background: var(--color-background-success-default, var(--accent2)); color: var(--color-text-on-success-default, var(--bg)) }
 @media (max-width: 560px) { #share-label { display: none } }
+/* Phones: the link on its own line, buttons underneath; smaller scene buttons */
+@media (max-width: 640px) {
+  #share-bar { flex-wrap: wrap; justify-content: center; border-radius: 22px; padding: 10px 12px; gap: 8px; width: calc(100% - 24px) }
+  #share-url { flex: 1 0 100%; text-align: center }
+  #hud { gap: 8px }
+  .hud-btn { min-height: 40px; padding: 0 14px; font-size: 13px; gap: 6px }
+  .scene-footer { font-size: 10px; border-radius: 14px }
+}
 
 /* --- Error: Unoff SemanticMessage (error) --- */
 #err-bar {
@@ -342,7 +373,7 @@ input[type=text].error { border-color: var(--input-border-color-error-default, v
           <input type="text" id="file-input" placeholder="https://app.spline.design/file/…" autocomplete="off" spellcheck="false" />
         </label>
         <div class="form-actions">
-          <button type="submit" class="btn btn-primary" id="go-btn" data-i18n="form.play"></button>
+          <button type="submit" class="btn btn-primary" id="go-btn" data-icon-after="forward" data-i18n="form.play"></button>
           <button type="button" class="btn btn-ghost" id="cancel-edit" hidden data-i18n="form.cancel"></button>
         </div>
         <p class="help" data-i18n-html="form.help"></p>
@@ -378,19 +409,21 @@ input[type=text].error { border-color: var(--input-border-color-error-default, v
 </div>
 
 <!-- HUD -->
+<div id="scene-bottom">
 <div id="hud">
-  <button class="hud-btn" id="btn-back" data-i18n="hud.home"></button>
-  <button class="hud-btn" id="btn-reset" data-i18n="hud.reset"></button>
-  <button class="hud-btn" id="btn-vr" disabled data-i18n="hud.enterVr"></button>
+  <button class="hud-btn" id="btn-back" data-icon="back" data-i18n="hud.home"></button>
+  <button class="hud-btn" id="btn-reset" data-icon="reset" data-i18n="hud.reset"></button>
+  <button class="hud-btn" id="btn-vr" data-icon="visible" disabled data-i18n="hud.enterVr"></button>
 </div>
 <footer class="scene-footer" data-i18n-html="home.footer"></footer>
+</div>
 
 <div id="share-bar">
   <span id="share-label" data-i18n="share.label"></span>
   <a id="share-url" href="#" target="_blank" rel="noopener"></a>
-  <a id="share-source" target="_blank" rel="noopener" data-i18n-title="actions.sourceTitle" hidden>Spline ↗</a>
-  <button id="share-thumb" data-i18n-title="share.thumbTitle">📷</button>
-  <button id="share-copy" data-i18n="share.copy"></button>
+  <a id="share-source" target="_blank" rel="noopener" data-icon-after="resize-to-fit" data-i18n-title="actions.sourceTitle" hidden>Spline</a>
+  <button id="share-thumb" data-icon="image" data-i18n-title="share.thumbTitle"><span data-i18n="share.thumb"></span></button>
+  <button id="share-copy" data-icon="copy" data-i18n="share.copy"></button>
 </div>
 
 <div id="err-bar"></div>

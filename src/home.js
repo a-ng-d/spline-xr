@@ -50,7 +50,8 @@ function thumb(id) {
 }
 
 function sourceLink(f) {
-  const a = el('a', 'btn btn-sm btn-ghost', 'Spline ↗')
+  const a = el('a', 'btn btn-sm btn-ghost', 'Spline')
+  a.dataset.iconAfter = 'resize-to-fit'
   a.href = fileUrlFromId(f); a.target = '_blank'; a.rel = 'noopener'
   setTitleKey(a, 'actions.sourceTitle')
   return a
@@ -100,6 +101,7 @@ export function initHome({ onPlay }) {
     info.append(el('div', 'work-title', ex.t), elKey('div', 'work-meta', 'templates.meta'))
     const actions = el('div', 'work-actions')
     const play = elKey('button', 'btn btn-sm btn-primary', 'actions.play')
+    play.dataset.icon = 'play'
     play.onclick = () => onPlay(ex, { save: false })
     actions.append(play, sourceLink(ex.f))
     row.append(thumb(ex.id), info, actions)
@@ -126,6 +128,7 @@ export function initHome({ onPlay }) {
       info.append(title, el('div', 'work-meta', `${s.id} · ${timeAgo(w.updatedAt)}`))
       const actions = el('div', 'work-actions')
       const play = elKey('button', 'btn btn-sm btn-primary', 'actions.play')
+    play.dataset.icon = 'play'
       play.onclick = () => onPlay(s, { save: true, editKey: w.key })
       const edit = elKey('button', 'btn btn-sm btn-ghost', current ? 'works.editing' : 'actions.edit')
       if (current) edit.classList.add('is-current')
